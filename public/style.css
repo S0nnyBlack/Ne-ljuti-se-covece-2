@@ -427,38 +427,57 @@ button { font-family: var(--font-body); }
 
 .board-grid {
   position: absolute;
-  inset: 8px;
+  inset: 12px;
   display: grid;
-  grid-template-columns: repeat(17, 1fr);
-  grid-template-rows: repeat(17, 1fr);
-  border-radius: calc(var(--radius-lg) - 6px);
-  overflow: hidden;
+  grid-template-columns: repeat(17, minmax(0, 1fr));
+  grid-template-rows: repeat(17, minmax(0, 1fr));
+  gap: 5px;
+  overflow: visible;
 }
 
 .cell {
-  background: var(--bg-secondary);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: transparent;
+  border: none;
   position: relative;
+  border-radius: 50%;
+  min-width: 0;
+  min-height: 0;
 }
-.cell.path-cell { background: #142c48; }
-.cell.corner-cell {
-  background: linear-gradient(135deg, #2a4461, #182f4b);
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent-gold) 55%, transparent);
-}
-.cell.start-red { background: color-mix(in srgb, var(--red) 45%, #142c48); }
-.cell.start-green { background: color-mix(in srgb, var(--green) 45%, #142c48); }
-.cell.start-yellow { background: color-mix(in srgb, var(--yellow) 45%, #142c48); }
-.cell.start-blue { background: color-mix(in srgb, var(--blue) 45%, #142c48); }
 
-.cell.home-col-red { background: linear-gradient(135deg, var(--red), #b8323c); }
-.cell.home-col-green { background: linear-gradient(135deg, var(--green), #159a55); }
-.cell.home-col-yellow { background: linear-gradient(135deg, var(--yellow), #d6a417); }
-.cell.home-col-blue { background: linear-gradient(135deg, var(--blue), #235fb8); }
+.cell.path-cell,
+.cell.home-col-red,
+.cell.home-col-green,
+.cell.home-col-yellow,
+.cell.home-col-blue,
+.cell.corner-cell {
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.28), inset 0 1px 2px rgba(255,255,255,0.18);
+}
+
+.cell.path-cell { background: radial-gradient(circle at 32% 28%, #254666, #142c48 72%); }
+
+.cell.corner-cell {
+  background: radial-gradient(circle at 32% 28%, #405b75, #1d3652 72%);
+  box-shadow: 0 5px 12px rgba(0,0,0,0.35), inset 0 0 0 2px color-mix(in srgb, var(--accent-gold) 62%, transparent);
+}
+
+.cell.start-red { background: radial-gradient(circle at 32% 28%, #ff737c, var(--red) 72%); }
+.cell.start-green { background: radial-gradient(circle at 32% 28%, #5ee9a5, var(--green) 72%); }
+.cell.start-yellow { background: radial-gradient(circle at 32% 28%, #ffe17b, var(--yellow) 72%); }
+.cell.start-blue { background: radial-gradient(circle at 32% 28%, #77aaff, var(--blue) 72%); }
+
+.cell.home-col-red { background: radial-gradient(circle at 32% 28%, #ff737c, #b8323c 72%); }
+.cell.home-col-green { background: radial-gradient(circle at 32% 28%, #5ee9a5, #159a55 72%); }
+.cell.home-col-yellow { background: radial-gradient(circle at 32% 28%, #ffe17b, #d6a417 72%); }
+.cell.home-col-blue { background: radial-gradient(circle at 32% 28%, #77aaff, #235fb8 72%); }
 
 .cell.center-cell {
   background: conic-gradient(var(--red) 0deg 90deg, var(--blue) 90deg 180deg, var(--yellow) 180deg 270deg, var(--green) 270deg 360deg);
   display: flex; align-items: center; justify-content: center;
   font-size: 1.1em;
+  border-radius: 50%;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3), inset 0 0 0 2px rgba(255,255,255,0.1);
 }
 
 .yard-box {
