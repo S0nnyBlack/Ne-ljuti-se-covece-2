@@ -1324,3 +1324,163 @@ body {
   }
 }
 
+
+/* =========================================================================
+   CLASSIC CROSS-BOARD REDESIGN v2
+   Yards sit directly against the home lanes and outer route.
+   ========================================================================= */
+
+.board {
+  --board-inset: 3.8%;
+  --board-gap: 4px;
+  width: calc(var(--cell) * 17);
+  height: calc(var(--cell) * 17);
+  background:
+    radial-gradient(circle at 48% 44%, rgba(255,255,255,.30), transparent 42%),
+    repeating-linear-gradient(3deg, rgba(112,67,31,.035) 0 2px, transparent 2px 11px),
+    linear-gradient(145deg, #f2dfb9 0%, #e7cda0 52%, #efd8ad 100%);
+  border: 2px solid #74411f;
+  border-radius: 20px;
+  box-shadow:
+    0 20px 34px rgba(29,12,4,.34),
+    inset 0 0 0 2px rgba(255,255,255,.42),
+    inset 0 0 22px rgba(103,54,21,.12);
+}
+
+.board-grid,
+.token-layer {
+  inset: var(--board-inset);
+}
+
+.cell.path-cell,
+.cell.corner-cell {
+  background:
+    radial-gradient(circle at 30% 26%, #fff9ec 0%, #f7ead0 52%, #dfc18e 100%);
+  border: 2px solid #84532f;
+  box-shadow:
+    0 3px 6px rgba(78,37,14,.25),
+    inset 0 2px 2px rgba(255,255,255,.72),
+    inset 0 -2px 3px rgba(115,65,27,.13);
+}
+
+.cell.start-red {
+  background: radial-gradient(circle at 28% 24%, #ffb8b2, #e6675d 52%, #b23d34);
+}
+.cell.start-green {
+  background: radial-gradient(circle at 28% 24%, #bdeecb, #65bb7f 52%, #338650);
+}
+.cell.start-yellow {
+  background: radial-gradient(circle at 28% 24%, #fff1aa, #edc74f 52%, #c29722);
+}
+.cell.start-blue {
+  background: radial-gradient(circle at 28% 24%, #c9e0ff, #6e9fd7 52%, #3a68a7);
+}
+
+.cell.home-col-red,
+.cell.home-col-green,
+.cell.home-col-yellow,
+.cell.home-col-blue {
+  border-width: 2px;
+}
+
+.yard-box {
+  width: 32.4% !important;
+  height: 32.4% !important;
+  border: 3px solid #74411f;
+  border-radius: 18px;
+  box-shadow:
+    0 8px 14px rgba(73,31,11,.22),
+    inset 0 0 0 3px rgba(255,247,224,.38),
+    inset 0 0 20px rgba(74,31,10,.12);
+}
+
+.yard-box--red {
+  left: 14.7% !important;
+  top: 14.7% !important;
+}
+.yard-box--green {
+  left: 52.7% !important;
+  top: 14.7% !important;
+}
+.yard-box--yellow {
+  left: 52.7% !important;
+  top: 52.7% !important;
+}
+.yard-box--blue {
+  left: 14.7% !important;
+  top: 52.7% !important;
+}
+
+.yard-box--red {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,245,235,.34), transparent 55%),
+    linear-gradient(145deg, #e8776a, #ad4037);
+}
+.yard-box--green {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(241,255,242,.34), transparent 55%),
+    linear-gradient(145deg, #79c88e, #397f4e);
+}
+.yard-box--yellow {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,250,219,.38), transparent 55%),
+    linear-gradient(145deg, #efd05a, #b08b20);
+}
+.yard-box--blue {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(238,246,255,.38), transparent 55%),
+    linear-gradient(145deg, #78a5dc, #426aa5);
+}
+
+.yard-slot-dot {
+  width: 32% !important;
+  height: 32% !important;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(255,255,255,.86), rgba(250,232,199,.98) 50%, rgba(177,143,98,.88) 100%);
+  border: 2px solid rgba(116,65,31,.78);
+  box-shadow:
+    0 3px 6px rgba(62,25,8,.24),
+    inset 0 2px 3px rgba(255,255,255,.72);
+}
+
+.token {
+  width: 70% !important;
+  height: 70% !important;
+  filter: saturate(1.03);
+  box-shadow:
+    0 8px 10px rgba(52,21,7,.29),
+    0 2px 4px rgba(52,21,7,.25),
+    inset 0 3px 4px rgba(255,255,255,.52),
+    inset 0 -5px 7px rgba(52,18,7,.18);
+}
+
+.token::before {
+  width: 30%;
+  height: 22%;
+}
+
+.token::after {
+  bottom: -10%;
+}
+
+.cell.center-cell {
+  background:
+    conic-gradient(
+      #d95348 0deg 90deg,
+      #4f82c5 90deg 180deg,
+      #e0b83f 180deg 270deg,
+      #55a96b 270deg 360deg
+    );
+  border: 3px solid #74411f;
+  box-shadow:
+    0 6px 14px rgba(66,27,9,.26),
+    inset 0 2px 3px rgba(255,255,255,.52);
+}
+
+@media (max-width: 820px) {
+  .yard-box {
+    width: 32.4% !important;
+    height: 32.4% !important;
+  }
+}
+
