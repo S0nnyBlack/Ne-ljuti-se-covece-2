@@ -1,0 +1,23 @@
+name: Build project ZIP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create ZIP
+        run: |
+          zip -r ne-ljuti-se-covece-2.zip .             -x ".git/*"                ".github/*"                "ne-ljuti-se-covece-2.zip"
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ne-ljuti-se-covece-2
+          path: ne-ljuti-se-covece-2.zip
