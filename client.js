@@ -536,12 +536,33 @@
     const tokens = state.tokens[myColor] || [];
     const dice = state.dice;
     const moves = [];
+    if (!dice) return moves;
+
+    const ownOccupies = (cell, excludeIdx) => tokens.some((t, idx) => {
+      if (idx === excludeIdx || t.state !== 'active' || t.step > STEPS_TO_ENTER_HOME - 1) return false;
+      return globalCellForStep(myColor, t.step) === cell;
+    });
+
     tokens.forEach((t, idx) => {
       if (t.state === 'home') return;
-      if (t.state === 'yard') { if (dice === 6) moves.push(idx); return; }
+
+      if (t.state === 'yard') {
+        if (dice === 6 && !ownOccupies(globalCellForStep(myColor, 0), idx)) moves.push(idx);
+        return;
+      }
+
       if (t.state === 'active') {
         const newStep = t.step + dice;
-        if (newStep <= 57) moves.push(idx);
+        if (newStep > 57) return;
+
+        if (newStep <= STEPS_TO_ENTER_HOME - 1) {
+          if (!ownOccupies(globalCellForStep(myColor, newStep), idx)) moves.push(idx);
+        } else {
+          const occupiedHome = tokens.some((other, otherIdx) =>
+            otherIdx !== idx && other.state === 'active' && other.step === newStep
+          );
+          if (!occupiedHome) moves.push(idx);
+        }
       }
     });
     return moves;
