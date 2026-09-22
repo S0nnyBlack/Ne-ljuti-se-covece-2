@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260922-2">
 </head>
 <body data-theme="dark">
 
@@ -63,11 +63,20 @@
       </div>
     </section>
 
+    
+      <div class="card card--solo">
+        <h2 class="card-title">Solo test režim</h2>
+        <p class="card-desc">Igraj sam protiv 3 bota i proveri pravila i kretanje figura.</p>
+        <button id="btn-solo-mode" class="btn btn--secondary btn--lg" aria-label="Pokreni solo test">🧪 Pokreni solo test</button>
+      </div>
+    
+
     <section class="feature-badges" aria-label="Prednosti igre">
-      <span class="badge">👥 2–4 igrača</span>
+      <span class="badge">👥 1–4 igrača</span>
       <span class="badge">🌐 Online uživo</span>
       <span class="badge">⚡ Brzo i jednostavno</span>
       <span class="badge">🎉 Zabava za sve generacije</span>
+      <span class="badge">🧪 Solo test protiv botova</span>
     </section>
 
     <footer class="home-footer">
@@ -99,7 +108,10 @@
       <div class="slot" data-slot="3"><div class="slot-inner slot-empty">⚪ Čeka igrača...</div></div>
     </section>
 
-    <button id="btn-start-game" class="btn btn--primary btn--lg" disabled aria-label="Počni igru">Počni igru</button>
+    <div class="lobby-actions">
+      <button id="btn-add-bot" class="btn btn--secondary" aria-label="Dodaj bota">🤖 Dodaj bota</button>
+      <button id="btn-start-game" class="btn btn--primary btn--lg" disabled aria-label="Počni igru">Počni igru</button>
+    </div>
     <p id="lobby-hint" class="lobby-hint">Potrebna su najmanje 2 igrača.</p>
     <p id="lobby-error" class="field-error" role="alert" aria-live="assertive"></p>
     <button id="btn-leave-lobby" class="btn btn--ghost btn--sm">← Napusti sobu</button>
@@ -118,8 +130,35 @@
   </header>
 
   <div class="game-body">
+    <aside class="log-panel" aria-label="Tok igre i ćaskanje">
+      <div class="tabs" role="tablist">
+        <button class="tab-btn active" data-tab="log" role="tab" aria-selected="true">📜 Tok igre</button>
+        <button class="tab-btn" data-tab="chat" role="tab" aria-selected="false">💬 Ćaskanje</button>
+      </div>
+
+      <div id="tab-log" class="tab-panel">
+        <div id="game-log" class="game-log" aria-live="polite"></div>
+      </div>
+
+      <div id="tab-chat" class="tab-panel hidden">
+        <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+        <div class="reactions-row">
+          <button class="reaction-btn" data-emoji="😀">😀</button>
+          <button class="reaction-btn" data-emoji="😂">😂</button>
+          <button class="reaction-btn" data-emoji="🔥">🔥</button>
+          <button class="reaction-btn" data-emoji="👑">👑</button>
+          <button class="reaction-btn" data-emoji="😭">😭</button>
+          <button class="reaction-btn" data-emoji="🎉">🎉</button>
+        </div>
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" class="field-input" type="text" maxlength="200" placeholder="Napiši poruku..." autocomplete="off" aria-label="Poruka za ćaskanje">
+          <button type="submit" class="btn btn--primary btn--sm" aria-label="Pošalji poruku">Pošalji</button>
+        </form>
+      </div>
+    </aside>
+
     <div class="board-wrap">
-      <div id="board" class="board" role="img" aria-label="Tabla za igru Ne ljuti se čoveče"></div>
+      <div id="board" class="board" role="img" aria-label="Tabla za igru Ne ljuti se čoveče sa 56 polja"></div>
     </div>
 
     <aside class="side-panel">
@@ -132,33 +171,6 @@
 
       <div id="player-cards" class="player-cards" aria-label="Igrači"></div>
     </aside>
-  </div>
-
-  <div class="bottom-panel">
-    <div class="tabs" role="tablist">
-      <button class="tab-btn active" data-tab="log" role="tab" aria-selected="true">📜 Tok igre</button>
-      <button class="tab-btn" data-tab="chat" role="tab" aria-selected="false">💬 Ćaskanje</button>
-    </div>
-
-    <div id="tab-log" class="tab-panel">
-      <div id="game-log" class="game-log" aria-live="polite"></div>
-    </div>
-
-    <div id="tab-chat" class="tab-panel hidden">
-      <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
-      <div class="reactions-row">
-        <button class="reaction-btn" data-emoji="😀">😀</button>
-        <button class="reaction-btn" data-emoji="😂">😂</button>
-        <button class="reaction-btn" data-emoji="🔥">🔥</button>
-        <button class="reaction-btn" data-emoji="👑">👑</button>
-        <button class="reaction-btn" data-emoji="😭">😭</button>
-        <button class="reaction-btn" data-emoji="🎉">🎉</button>
-      </div>
-      <form id="chat-form" class="chat-form">
-        <input id="chat-input" class="field-input" type="text" maxlength="200" placeholder="Napiši poruku..." autocomplete="off" aria-label="Poruka za ćaskanje">
-        <button type="submit" class="btn btn--primary btn--sm" aria-label="Pošalji poruku">Pošalji</button>
-      </form>
-    </div>
   </div>
 </main>
 
@@ -217,6 +229,6 @@
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="client.js"></script>
+<script src="client.js?v=20260922-2"></script>
 </body>
 </html>
