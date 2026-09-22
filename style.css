@@ -1745,3 +1745,75 @@ body {
     top: 57.29% !important;
   }
 }
+
+
+/* =========================================================================
+   FINISH-LANE CONNECTIONS + START-FIELD MARKERS
+   ========================================================================= */
+
+.cell.home-connector-red {
+  background: linear-gradient(180deg, #f4958b 0%, #d85249 48%, #b43e35 100%);
+  border: 2px solid #7c2e26;
+  border-radius: 12px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  transform: scaleX(1.08);
+  z-index: 2;
+  box-shadow:
+    0 3px 6px rgba(73,28,10,.22),
+    inset 0 2px 3px rgba(255,255,255,.38),
+    inset 0 -3px 4px rgba(91,26,10,.16);
+}
+
+.cell.home-connector-blue {
+  background: linear-gradient(90deg, #8bb8ea 0%, #5f8fc9 48%, #3f6eae 100%);
+  border: 2px solid #2d5689;
+  border-radius: 12px;
+  margin-left: -2px;
+  margin-right: -2px;
+  transform: scaleY(1.08);
+  z-index: 2;
+  box-shadow:
+    0 3px 6px rgba(35,38,48,.20),
+    inset 0 2px 3px rgba(255,255,255,.42),
+    inset 0 -3px 4px rgba(35,56,90,.14);
+}
+
+/* A strong but compact marker for the actual starting field. */
+.cell.start-cell {
+  outline: 3px solid rgba(255,255,255,.78);
+  outline-offset: -3px;
+  box-shadow:
+    0 0 0 3px rgba(89,44,17,.28),
+    0 4px 8px rgba(67,28,9,.26),
+    inset 0 2px 3px rgba(255,255,255,.68),
+    inset 0 -2px 3px rgba(87,40,13,.16);
+  z-index: 3;
+}
+
+.cell.start-cell::after {
+  content: "★";
+  position: absolute;
+  top: 4%;
+  right: 4%;
+  width: 34%;
+  height: 34%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: .48em;
+  line-height: 1;
+  color: #fff7dc;
+  background: rgba(98,50,21,.52);
+  border: 1px solid rgba(255,255,255,.66);
+  box-shadow: 0 1px 3px rgba(60,24,6,.24);
+  pointer-events: none;
+  z-index: 4;
+}
+
+.cell.start-red::after { background: rgba(126,39,30,.62); }
+.cell.start-green::after { background: rgba(35,105,55,.62); }
+.cell.start-yellow::after { background: rgba(123,91,13,.62); }
+.cell.start-blue::after { background: rgba(39,73,122,.62); }
+
