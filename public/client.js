@@ -431,7 +431,6 @@
 
     // Center
     cellMap['7,7'].classList.add('center-cell');
-    cellMap['7,7'].textContent = '🏆';
 
     boardEl.appendChild(grid);
 
@@ -445,16 +444,13 @@
     yardBoxes.forEach(({ color, r0, c0 }) => {
       const box = document.createElement('div');
       box.className = 'yard-box yard-box--' + color;
-      box.style.left = 'calc(8px + ' + c0 + ' * (100% - 16px) / 15)';
-      box.style.top = 'calc(8px + ' + r0 + ' * (100% - 16px) / 15)';
-      box.style.width = 'calc(6 * (100% - 16px) / 15)';
-      box.style.height = 'calc(6 * (100% - 16px) / 15)';
+      // Yard position/size is controlled by CSS so it stays aligned with the 17x17 grid.
       boardEl.insertBefore(box, grid);
       YARD_SLOTS[color].forEach(([r, c]) => {
         const dot = document.createElement('div');
         dot.className = 'yard-slot-dot';
-        dot.style.left = 'calc((' + (c - c0) + ' + 0.33) * (100% / 6))';
-        dot.style.top = 'calc((' + (r - r0) + ' + 0.33) * (100% / 6))';
+        dot.style.left = 'calc((' + (c - c0) + ' + 0.32) * (100% / 5))';
+        dot.style.top = 'calc((' + (r - r0) + ' + 0.32) * (100% / 5))';
         box.appendChild(dot);
       });
     });
@@ -462,8 +458,7 @@
     // Token layer
     const tokenLayer = document.createElement('div');
     tokenLayer.id = 'token-layer';
-    tokenLayer.style.position = 'absolute';
-    tokenLayer.style.inset = '8px';
+    tokenLayer.className = 'token-layer';
     boardEl.appendChild(tokenLayer);
 
     boardBuilt = true;
@@ -507,25 +502,31 @@
     const isMyTurn = state.started && !state.winner && state.players[state.currentPlayerIndex] && state.players[state.currentPlayerIndex].id === myPlayerId;
     const myMoves = isMyTurn && state.dice !== null ? computeLocalMovableHint(state) : [];
 
+    const pixelSpread = group => group.length > 1
+      ? Math.max(2, boardEl.clientWidth * 0.008)
+      : 0;
+
     Object.entries(byCell).forEach(([key, group]) => {
       const [r, c] = key.split(',').map(Number);
-      const base = cellToPercentPos([r, c]);
+      const spread = pixelSpread(group);
+
       group.forEach((item, i) => {
         const el = document.createElement('div');
         el.className = 'token token--' + item.color;
         if (group.length > 1) el.classList.add('stack-' + Math.min(group.length, 4));
-        const cellPct = 100 / 17;
-        const size = cellPct * 0.62;
-        el.style.width = size + '%';
-        el.style.height = size + '%';
-        // Small fan-out offset so stacked tokens on one cell are all visible.
+
+        // Put each token in the exact same CSS grid cell as the board field.
+        // This keeps pieces centered even when the board scales responsively.
+        el.style.gridRow = String(r + 1);
+        el.style.gridColumn = String(c + 1);
+        el.style.width = '72%';
+        el.style.height = '72%';
+
+        // Small fan-out only when several pieces share one field.
         const angle = (i / group.length) * Math.PI * 2;
-        const spread = group.length > 1 ? cellPct * 0.16 : 0;
-        const left = base.left + Math.cos(angle) * spread;
-        const top = base.top + Math.sin(angle) * spread;
-        el.style.left = left + '%';
-        el.style.top = top + '%';
-        el.style.transform = 'translate(-50%, -50%)';
+        const dx = Math.cos(angle) * spread;
+        const dy = Math.sin(angle) * spread;
+        el.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
 
         const movable = item.color === myColor && myMoves.includes(item.idx);
         if (movable) {
