@@ -1484,3 +1484,220 @@ body {
   }
 }
 
+
+/* =========================================================================
+   REFERENCE-STYLE FINISH v3
+   Four compact home yards are locked to the same 17x17 board geometry.
+   The path is visually continuous around them and pieces read as plastic pawns.
+   ========================================================================= */
+
+.board {
+  --board-inset: 3.8%;
+  --board-gap: 3px;
+  background:
+    radial-gradient(circle at 45% 40%, rgba(255,255,255,.22), transparent 38%),
+    repeating-linear-gradient(4deg, rgba(113,68,33,.035) 0 2px, transparent 2px 12px),
+    linear-gradient(140deg, #efd9ae 0%, #e5ca9d 52%, #f0d9ae 100%);
+  border: 2px solid #73421f;
+  border-radius: 18px;
+  box-shadow:
+    0 22px 38px rgba(31,13,5,.30),
+    inset 0 0 0 2px rgba(255,255,255,.42),
+    inset 0 0 22px rgba(105,52,19,.10);
+}
+
+.board-grid,
+.token-layer {
+  inset: var(--board-inset);
+  gap: var(--board-gap);
+}
+
+.cell.path-cell,
+.cell.corner-cell,
+.cell.home-col-red,
+.cell.home-col-green,
+.cell.home-col-yellow,
+.cell.home-col-blue {
+  border: 2px solid #85512c;
+  box-shadow:
+    0 3px 6px rgba(70,29,10,.22),
+    inset 0 2px 2px rgba(255,255,255,.72),
+    inset 0 -2px 3px rgba(108,56,20,.13);
+}
+
+.cell.path-cell,
+.cell.corner-cell {
+  background:
+    radial-gradient(circle at 32% 24%, #fff9ee 0%, #f5e6c9 55%, #d9b57e 100%);
+}
+
+.cell.home-col-red {
+  background: radial-gradient(circle at 30% 22%, #ffd2cc, #ea756b 55%, #bc4439);
+}
+.cell.home-col-green {
+  background: radial-gradient(circle at 30% 22%, #d6f6dc, #70c88e 55%, #388c55);
+}
+.cell.home-col-yellow {
+  background: radial-gradient(circle at 30% 22%, #fff7cb, #eed263 55%, #c59a28);
+}
+.cell.home-col-blue {
+  background: radial-gradient(circle at 30% 22%, #d5e8ff, #79a9e0 55%, #416fb0);
+}
+
+.cell.center-cell {
+  background:
+    linear-gradient(45deg,
+      #d85a4e 0% 24.9%,
+      #e8d6ab 25% 49.9%,
+      #4f86c9 50% 74.9%,
+      #e8d6ab 75% 100%);
+  border: 2px solid #74411f;
+  border-radius: 10px;
+  box-shadow:
+    inset 0 2px 3px rgba(255,255,255,.52),
+    0 4px 8px rgba(71,28,9,.18);
+}
+
+/* Exact 6x6-yard geometry, aligned to the inner 17x17 grid. */
+.yard-box {
+  z-index: 0;
+  width: calc(6 * (100% - (2 * var(--board-inset))) / 17) !important;
+  height: calc(6 * (100% - (2 * var(--board-inset))) / 17) !important;
+  border: 3px solid #74411f;
+  border-radius: 20px;
+  box-shadow:
+    0 7px 13px rgba(67,28,9,.24),
+    inset 0 0 0 3px rgba(255,249,226,.35),
+    inset 0 0 18px rgba(71,29,10,.12);
+}
+
+/* r0/c0 = 2,2 -> top-left */
+.yard-box--red {
+  left: calc(var(--board-inset) + 2 * (100% - (2 * var(--board-inset))) / 17) !important;
+  top:  calc(var(--board-inset) + 2 * (100% - (2 * var(--board-inset))) / 17) !important;
+}
+/* r0/c0 = 2,10 -> top-right */
+.yard-box--green {
+  left: calc(var(--board-inset) + 10 * (100% - (2 * var(--board-inset))) / 17) !important;
+  top:  calc(var(--board-inset) + 2 * (100% - (2 * var(--board-inset))) / 17) !important;
+}
+/* r0/c0 = 10,10 -> bottom-right */
+.yard-box--yellow {
+  left: calc(var(--board-inset) + 10 * (100% - (2 * var(--board-inset))) / 17) !important;
+  top:  calc(var(--board-inset) + 10 * (100% - (2 * var(--board-inset))) / 17) !important;
+}
+/* r0/c0 = 10,2 -> bottom-left */
+.yard-box--blue {
+  left: calc(var(--board-inset) + 2 * (100% - (2 * var(--board-inset))) / 17) !important;
+  top:  calc(var(--board-inset) + 10 * (100% - (2 * var(--board-inset))) / 17) !important;
+}
+
+.yard-box--red {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,245,238,.35), transparent 58%),
+    linear-gradient(145deg, #ec8377, #b4473d);
+}
+.yard-box--green {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(241,255,244,.35), transparent 58%),
+    linear-gradient(145deg, #80cc95, #3d8e57);
+}
+.yard-box--yellow {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255,252,224,.37), transparent 58%),
+    linear-gradient(145deg, #f0d466, #ba942a);
+}
+.yard-box--blue {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(242,248,255,.38), transparent 58%),
+    linear-gradient(145deg, #82aee4, #456fae);
+}
+
+.yard-slot-dot {
+  width: 32% !important;
+  height: 32% !important;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, #fffdf2 0%, #f4e4bf 55%, #d7bd8f 100%);
+  border: 2px solid rgba(115,65,30,.78);
+  box-shadow:
+    0 3px 6px rgba(59,23,7,.22),
+    inset 0 2px 3px rgba(255,255,255,.78);
+}
+
+/* Plastic pawns: rounded head, narrower body, soft base shadow. */
+.token {
+  width: 64% !important;
+  height: 78% !important;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 48% 48% 42% 42% / 42% 42% 58% 58%;
+  filter: saturate(1.02);
+  box-shadow:
+    0 7px 9px rgba(56,22,7,.28),
+    0 2px 3px rgba(56,22,7,.24),
+    inset 0 3px 5px rgba(255,255,255,.55),
+    inset 0 -6px 8px rgba(54,19,7,.18);
+}
+
+.token::before {
+  content: "";
+  position: absolute;
+  left: 25%;
+  top: -2%;
+  width: 50%;
+  height: 30%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.92), rgba(255,255,255,.26) 42%, transparent 70%);
+  box-shadow: inset 0 -2px 3px rgba(255,255,255,.24);
+  filter: none;
+  opacity: .8;
+}
+
+.token::after {
+  content: "";
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  bottom: -8%;
+  height: 18%;
+  border-radius: 50%;
+  background: rgba(73,27,8,.24);
+  box-shadow:
+    0 2px 3px rgba(48,17,5,.22),
+    inset 0 2px 2px rgba(255,255,255,.16);
+  filter: blur(1px);
+}
+
+.token--red {
+  background: linear-gradient(160deg, #ffb9b4 0%, #e9665d 42%, #b63d35 100%);
+}
+.token--green {
+  background: linear-gradient(160deg, #d2f8d9 0%, #61c782 42%, #2d8a4c 100%);
+}
+.token--yellow {
+  background: linear-gradient(160deg, #fff7c9 0%, #f2cc52 42%, #c69926 100%);
+}
+.token--blue {
+  background: linear-gradient(160deg, #d9e9ff 0%, #70a4df 42%, #3d6eb1 100%);
+}
+
+.token.movable {
+  outline: 3px solid rgba(232,183,70,.85);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 6px rgba(232,183,70,.13),
+    0 8px 11px rgba(53,21,6,.30),
+    inset 0 3px 5px rgba(255,255,255,.58);
+}
+
+/* Keep the board as a single centered object on smaller screens. */
+@media (max-width: 820px) {
+  .board {
+    --board-inset: 8%;
+  }
+  .yard-box {
+    width: calc(6 * (100% - (2 * var(--board-inset))) / 17) !important;
+    height: calc(6 * (100% - (2 * var(--board-inset))) / 17) !important;
+  }
+}
+
