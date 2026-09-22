@@ -22,10 +22,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 const COLORS = ['red', 'green', 'yellow', 'blue'];
 const COLOR_NAMES_SR = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 'Plavi' };
 // Where each color starts on the shared 52-cell ring.
-const START_OFFSET = { red: 0, green: 13, yellow: 26, blue: 39 };
+const START_OFFSET = { red: 0, green: 14, yellow: 28, blue: 42 };
 // Cells (relative to a color's own path, i.e. "step" numbers 0-50) that are safe stars.
-const SAFE_STEP_OFFSETS = [0, 8];
-const SHARED_LENGTH = 52;
+const SHARED_LENGTH = 56;
 const HOME_COLUMN_LENGTH = 6;
 const STEPS_TO_ENTER_HOME = 51; // steps 0..50 are on the shared ring
 const FINISH_STEP = STEPS_TO_ENTER_HOME + HOME_COLUMN_LENGTH; // 57 = finished
@@ -65,14 +64,11 @@ function globalCellForStep(color, step) {
   return (START_OFFSET[color] + step) % SHARED_LENGTH;
 }
 
-function isSafeStep(step) {
-  return SAFE_STEP_OFFSETS.includes(step);
-}
-
 function newRoom(code, hostSocketId) {
   return {
     code,
     createdAt: Date.now(),
+    solo: false,
     players: [], // { id, socketId, name, color, connected, isHost }
     started: false,
     currentPlayerIndex: 0,
@@ -84,6 +80,7 @@ function newRoom(code, hostSocketId) {
     log: [],
     winner: null,
     lastChatAt: {}, // playerId -> timestamp
+    botTimer: null,
   };
 }
 
@@ -108,12 +105,14 @@ function publicRoomState(room) {
     lastRoll: room.lastRoll,
     rolling: room.rolling,
     winner: room.winner,
+    solo: !!room.solo,
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
       color: p.color,
       connected: p.connected,
       isHost: p.isHost,
+      isBot: !!p.isBot,
     })),
     tokens: room.tokens,
     log: room.log.slice(-40),
@@ -137,20 +136,46 @@ function playerTokens(room, color) {
 }
 
 /** Compute which of a color's tokens can legally move with a given dice value. */
+function ownTokenOccupiesGlobalCell(room, color, cell, excludeTokenIdx = -1) {
+  return (room.tokens[color] || []).some((t, idx) => {
+    if (idx === excludeTokenIdx || t.state !== 'active') return false;
+    return t.step <= STEPS_TO_ENTER_HOME - 1 && globalCellForStep(color, t.step) === cell;
+  });
+}
+
 function legalMoves(room, color, diceValue) {
   const moves = [];
   const tokens = playerTokens(room, color);
+
   tokens.forEach((t, idx) => {
-    if (t.state === 'home') return; // finished
+    if (t.state === 'home') return;
+
     if (t.state === 'yard') {
-      if (diceValue === 6) moves.push(idx);
+      if (diceValue === 6 && !ownTokenOccupiesGlobalCell(room, color, globalCellForStep(color, 0))) {
+        moves.push(idx);
+      }
       return;
     }
+
     if (t.state === 'active') {
       const newStep = t.step + diceValue;
-      if (newStep <= FINISH_STEP) moves.push(idx);
+      if (newStep > FINISH_STEP) return;
+
+      if (newStep <= STEPS_TO_ENTER_HOME - 1) {
+        const destinationCell = globalCellForStep(color, newStep);
+        if (!ownTokenOccupiesGlobalCell(room, color, destinationCell, idx)) {
+          moves.push(idx);
+        }
+      } else {
+        // Home column fields are also single-occupancy.
+        const occupied = tokens.some((other, otherIdx) =>
+          otherIdx !== idx && other.state === 'active' && other.step === newStep
+        );
+        if (!occupied) moves.push(idx);
+      }
     }
   });
+
   return moves;
 }
 
@@ -187,7 +212,7 @@ function applyMove(room, color, tokenIdx, diceValue) {
   }
 
   // Capture check — only while on the shared ring, and not on a safe cell.
-  if (token.state === 'active' && token.step <= STEPS_TO_ENTER_HOME - 1 && !isSafeStep(token.step)) {
+  if (token.state === 'active' && token.step <= STEPS_TO_ENTER_HOME - 1) {
     const cell = globalCellForStep(color, token.step);
     const occupants = tokensOccupyingGlobalCell(room, cell, color);
     for (const occ of occupants) {
@@ -208,6 +233,7 @@ function allTokensHome(room, color) {
 function advanceTurn(room, keepTurn) {
   if (keepTurn) {
     room.dice = null;
+    scheduleBotTurn(room);
     return;
   }
   const n = room.players.length;
@@ -220,6 +246,7 @@ function advanceTurn(room, keepTurn) {
   room.currentPlayerIndex = next;
   room.dice = null;
   room.consecutiveSixes = 0;
+  scheduleBotTurn(room);
 }
 
 function nameFor(room, color) {
@@ -241,6 +268,78 @@ function cleanupEmptyRoomsTick() {
   }
 }
 setInterval(cleanupEmptyRoomsTick, 60 * 1000);
+
+
+// ---------------------------------------------------------------------------
+// Solo mode / bot helpers
+// ---------------------------------------------------------------------------
+
+function logMoveEvents(room, events) {
+  for (const ev of events) {
+    if (ev.type === 'capture') {
+      pushLog(room, `${nameFor(room, ev.color)} je pojeo/la figuru igrača ${nameFor(room, ev.capturedColor)}!`);
+    } else if (ev.type === 'finish') {
+      pushLog(room, `${nameFor(room, ev.color)} je doveo/la figuru kući!`);
+    } else if (ev.type === 'exit') {
+      pushLog(room, `${nameFor(room, ev.color)} je izveo/la figuru iz dvorišta.`);
+    }
+  }
+}
+
+function scheduleBotTurn(room) {
+  if (!room || !room.solo || !room.started || room.winner) return;
+  clearTimeout(room.botTimer);
+  room.botTimer = null;
+
+  const player = currentPlayer(room);
+  if (!player || !player.isBot) return;
+
+  room.botTimer = setTimeout(() => {
+    botTakeTurn(room);
+  }, 850);
+}
+
+function botTakeTurn(room) {
+  if (!room || !rooms.has(room.code) || !room.solo || !room.started || room.winner) return;
+  const bot = currentPlayer(room);
+  if (!bot || !bot.isBot) return;
+
+  const value = 1 + Math.floor(Math.random() * 6);
+  room.dice = value;
+  room.lastRoll = value;
+  if (value === 6) room.consecutiveSixes += 1;
+  else room.consecutiveSixes = 0;
+
+  pushLog(room, `${bot.name} je bacio/la ${value}.`);
+  broadcastState(room);
+
+  room.botTimer = setTimeout(() => {
+    if (!rooms.has(room.code) || room.currentPlayerIndex !== room.players.findIndex((p) => p.id === bot.id) || room.winner) return;
+
+    const moves = legalMoves(room, bot.color, value);
+    if (moves.length === 0) {
+      pushLog(room, `${bot.name} nema legalan potez.`);
+      advanceTurn(room, false);
+      broadcastState(room);
+      return;
+    }
+
+    const tokenIdx = moves[Math.floor(Math.random() * moves.length)];
+    const events = applyMove(room, bot.color, tokenIdx, value);
+    logMoveEvents(room, events);
+
+    let wonNow = false;
+    if (allTokensHome(room, bot.color)) {
+      room.winner = { color: bot.color, name: bot.name };
+      pushLog(room, `🏆 ${bot.name} je pobednik!`);
+      wonNow = true;
+    }
+
+    const gotAnotherTurn = !wonNow && value === 6 && room.consecutiveSixes < 3;
+    advanceTurn(room, gotAnotherTurn);
+    broadcastState(room);
+  }, 650);
+}
 
 // ---------------------------------------------------------------------------
 // Socket.io handlers
@@ -264,6 +363,7 @@ io.on('connection', (socket) => {
         color: COLORS[0],
         connected: true,
         isHost: true,
+        isBot: false,
       };
       room.players.push(player);
       rooms.set(code, room);
@@ -277,6 +377,54 @@ io.on('connection', (socket) => {
       broadcastState(room);
     } catch (err) {
       cb && cb({ ok: false, error: 'Greška pri kreiranju sobe.' });
+    }
+  });
+
+  socket.on('create_solo', (payload, cb) => {
+    try {
+      const name = sanitizeName(payload && payload.name) || 'Igrač';
+      const code = makeRoomCode();
+      const room = newRoom(code, socket.id);
+      room.solo = true;
+      room.started = true;
+      initTokens(room);
+
+      const human = {
+        id: socket.id,
+        socketId: socket.id,
+        name,
+        color: COLORS[0],
+        connected: true,
+        isHost: true,
+        isBot: false,
+      };
+      room.players.push(human);
+
+      const botNames = { green: 'BOT Zeleni', yellow: 'BOT Žuti', blue: 'BOT Plavi' };
+      for (let i = 1; i < COLORS.length; i++) {
+        const color = COLORS[i];
+        room.players.push({
+          id: `bot-${color}-${code}`,
+          socketId: null,
+          name: botNames[color],
+          color,
+          connected: true,
+          isHost: false,
+          isBot: true,
+        });
+      }
+
+      rooms.set(code, room);
+      socket.join(code);
+      currentRoomCode = code;
+      currentPlayerId = human.id;
+
+      pushLog(room, 'Solo test je pokrenut. Igraš protiv 3 bota.');
+      cb && cb({ ok: true, code, playerId: human.id, color: human.color, solo: true });
+      broadcastState(room);
+      scheduleBotTurn(room);
+    } catch (err) {
+      cb && cb({ ok: false, error: 'Greška pri pokretanju solo testa.' });
     }
   });
 
@@ -309,6 +457,7 @@ io.on('connection', (socket) => {
         color,
         connected: true,
         isHost: false,
+        isBot: false,
       };
       room.players.push(player);
 
@@ -418,7 +567,8 @@ io.on('connection', (socket) => {
     const me = room.players.find((p) => p.id === currentPlayerId);
     if (!me || !me.isHost) return cb && cb({ ok: false, error: 'Samo domaćin može započeti novu igru.' });
 
-    room.started = false;
+    clearTimeout(room.botTimer);
+    room.botTimer = null;
     room.winner = null;
     room.dice = null;
     room.lastRoll = null;
@@ -426,9 +576,19 @@ io.on('connection', (socket) => {
     room.consecutiveSixes = 0;
     initTokens(room);
     room.log = [];
-    pushLog(room, 'Nova igra je spremna. Domaćin može ponovo pokrenuti igru.');
-    cb && cb({ ok: true });
-    broadcastState(room);
+
+    if (room.solo) {
+      room.started = true;
+      pushLog(room, 'Nova solo igra je spremna. Igraš protiv 3 bota.');
+      cb && cb({ ok: true, solo: true });
+      broadcastState(room);
+      scheduleBotTurn(room);
+    } else {
+      room.started = false;
+      pushLog(room, 'Nova igra je spremna. Domaćin može ponovo pokrenuti igru.');
+      cb && cb({ ok: true, solo: false });
+      broadcastState(room);
+    }
   });
 
   socket.on('send_chat_message', (payload) => {
