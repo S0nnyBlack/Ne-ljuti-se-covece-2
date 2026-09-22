@@ -436,17 +436,28 @@ button { font-family: var(--font-body); }
 /* ---------- Board ---------- */
 .board {
   --cell: min(6.2vw, 34px);
+  --wood-light: #E9CFA3;
+  --wood-mid: #D8B37E;
+  --wood-dark: #A9723F;
   width: calc(var(--cell) * 15);
   height: calc(var(--cell) * 15);
   max-width: 100%;
   aspect-ratio: 1 / 1;
   position: relative;
-  background: linear-gradient(160deg, #0a1f34, #061224);
+  background:
+    radial-gradient(circle at 30% 22%, var(--wood-light), var(--wood-mid) 55%, var(--wood-dark) 130%);
   border-radius: var(--radius-lg);
-  border: 3px solid var(--border);
-  box-shadow: var(--shadow-lift), inset 0 0 0 6px rgba(0,0,0,0.25);
+  border: 6px solid #7A4E28;
+  box-shadow: var(--shadow-lift), inset 0 0 0 3px rgba(255, 240, 210, 0.35), inset 0 0 30px rgba(70, 40, 10, 0.35);
   padding: 8px;
   overflow: hidden;
+}
+/* A faint wood-grain texture, purely decorative. */
+.board::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(115deg, rgba(120, 78, 34, 0.07) 0px, rgba(120, 78, 34, 0.07) 2px, transparent 2px, transparent 10px);
+  pointer-events: none;
 }
 @media (min-width: 480px) { .board { --cell: min(6.2vw, 38px); } }
 @media (min-width: 860px) { .board { --cell: min(4.2vw, 42px); } }
@@ -462,50 +473,75 @@ button { font-family: var(--font-body); }
 }
 
 .cell {
-  background: var(--bg-secondary);
-  border: 1px solid rgba(255,255,255,0.05);
+  background: transparent;
+  border: none;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.cell.path-cell { background: #142c48; }
+/* Path cells render as flat wooden-toy-style dots, like the reference board. */
+.cell.path-cell::before {
+  content: '';
+  display: block;
+  width: 74%;
+  height: 74%;
+  border-radius: 50%;
+  background: rgba(255, 250, 240, 0.55);
+  box-shadow: inset 0 -2px 3px rgba(90, 55, 20, 0.25), 0 1px 2px rgba(60, 35, 10, 0.3);
+}
 .cell.safe-cell::after {
-  content: '★';
+  content: '⚓';
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 0.7em;
-  color: var(--accent-gold);
-  opacity: 0.85;
+  font-size: 0.62em;
+  color: #5a3a14;
+  opacity: 0.75;
 }
-.cell.start-red { background: color-mix(in srgb, var(--red) 45%, #142c48); }
-.cell.start-green { background: color-mix(in srgb, var(--green) 45%, #142c48); }
-.cell.start-yellow { background: color-mix(in srgb, var(--yellow) 45%, #142c48); }
-.cell.start-blue { background: color-mix(in srgb, var(--blue) 45%, #142c48); }
+.cell.start-red::before { background: var(--red); box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.4); }
+.cell.start-green::before { background: var(--green); box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.4); }
+.cell.start-yellow::before { background: var(--yellow); box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.4); }
+.cell.start-blue::before { background: var(--blue); box-shadow: inset 0 -2px 3px rgba(0,0,0,0.25), 0 0 0 2px rgba(255,255,255,0.4); }
 
-.cell.home-col-red { background: linear-gradient(135deg, var(--red), #b8323c); }
-.cell.home-col-green { background: linear-gradient(135deg, var(--green), #159a55); }
-.cell.home-col-yellow { background: linear-gradient(135deg, var(--yellow), #d6a417); }
-.cell.home-col-blue { background: linear-gradient(135deg, var(--blue), #235fb8); }
+.cell.home-col-red::before { background: var(--red); }
+.cell.home-col-green::before { background: var(--green); }
+.cell.home-col-yellow::before { background: var(--yellow); }
+.cell.home-col-blue::before { background: var(--blue); }
 
 .cell.center-cell {
-  background: conic-gradient(var(--red) 0deg 90deg, var(--blue) 90deg 180deg, var(--yellow) 180deg 270deg, var(--green) 270deg 360deg);
+  background: radial-gradient(circle, #FFE9B8, var(--accent-gold) 70%, #B8862F 100%);
+  border-radius: 50%;
+  width: 92%; height: 92%;
+  margin: auto;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.35), inset 0 -3px 6px rgba(120, 70, 10, 0.35), 0 4px 14px rgba(0,0,0,0.35);
   display: flex; align-items: center; justify-content: center;
-  font-size: 1.1em;
 }
+.center-die {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #4A2E0B;
+}
+.center-die-face { font-size: 1.5em; line-height: 1; }
+.center-die-face.has-roll { color: #2E1B04; text-shadow: 0 1px 0 rgba(255,255,255,0.4); }
+.center-die-label { font-size: 0.24em; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.75; margin-top: 2px; }
 
+/* Yard "corrals" echo the dashed circle rings around the pieces on the
+   reference wooden board, sitting on the same warm wood surface. */
 .yard-box {
   position: absolute;
-  border-radius: 14px;
-  opacity: 0.9;
+  border-radius: 50%;
+  opacity: 0.95;
+  background: rgba(255, 250, 240, 0.28);
 }
-.yard-box--red { background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--red) 55%, #0a1f34), #0a1f34); }
-.yard-box--green { background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--green) 55%, #0a1f34), #0a1f34); }
-.yard-box--yellow { background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--yellow) 55%, #0a1f34), #0a1f34); }
-.yard-box--blue { background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--blue) 55%, #0a1f34), #0a1f34); }
+.yard-box--red { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--red) 75%, transparent), inset 0 0 0 6px rgba(255,255,255,0.25); }
+.yard-box--green { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--green) 75%, transparent), inset 0 0 0 6px rgba(255,255,255,0.25); }
+.yard-box--yellow { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--yellow) 75%, transparent), inset 0 0 0 6px rgba(255,255,255,0.25); }
+.yard-box--blue { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--blue) 75%, transparent), inset 0 0 0 6px rgba(255,255,255,0.25); }
 .yard-slot-dot {
   position: absolute;
   width: 34%; height: 34%;
   border-radius: 50%;
-  background: rgba(255,255,255,0.08);
-  border: 1.5px dashed rgba(255,255,255,0.18);
+  background: rgba(90, 55, 20, 0.12);
+  border: 1.5px dashed rgba(90, 55, 20, 0.3);
 }
 
 /* ---------- Tokens ---------- */

@@ -77,6 +77,7 @@ function newRoom(code, hostSocketId) {
     started: false,
     currentPlayerIndex: 0,
     dice: null,
+    lastRoll: null, // persists for display purposes even after `dice` is cleared
     rolling: false,
     consecutiveSixes: 0,
     tokens: {}, // color -> [ {state:'yard'|'active'|'home', step:number, slot:number} x4 ]
@@ -104,6 +105,7 @@ function publicRoomState(room) {
     started: room.started,
     currentPlayerIndex: room.currentPlayerIndex,
     dice: room.dice,
+    lastRoll: room.lastRoll,
     rolling: room.rolling,
     winner: room.winner,
     players: room.players.map((p) => ({
@@ -347,6 +349,7 @@ io.on('connection', (socket) => {
 
     const value = 1 + Math.floor(Math.random() * 6);
     room.dice = value;
+    room.lastRoll = value;
     if (value === 6) room.consecutiveSixes += 1;
     else room.consecutiveSixes = 0;
 
@@ -418,6 +421,7 @@ io.on('connection', (socket) => {
     room.started = false;
     room.winner = null;
     room.dice = null;
+    room.lastRoll = null;
     room.currentPlayerIndex = 0;
     room.consecutiveSixes = 0;
     initTokens(room);

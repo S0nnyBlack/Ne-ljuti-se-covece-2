@@ -201,6 +201,19 @@
       if (!res || !res.ok) {
         diceButton.disabled = false;
         if (res && res.error) diceStatus.textContent = res.error;
+        return;
+      }
+      // Auto-play: if exactly one token can legally move, play it automatically
+      // so the person doesn't have to tap it manually.
+      if (res.moves && res.moves.length === 1) {
+        diceStatus.textContent = 'Automatski potez...';
+        setTimeout(() => {
+          socket.emit('move_token', { tokenIdx: res.moves[0] }, (moveRes) => {
+            if (!moveRes || !moveRes.ok) {
+              if (moveRes && moveRes.error) showToast(moveRes.error);
+            }
+          });
+        }, 550);
       }
     });
   });
@@ -404,16 +417,20 @@
       });
     });
 
-    // Home columns
+    // Home columns — reuse the "path-cell" dot styling, tinted per color.
     COLORS.forEach((color) => {
       HOME_COLUMNS[color].forEach(([r, c]) => {
-        cellMap[r + ',' + c].classList.add('home-col-' + color);
+        cellMap[r + ',' + c].classList.add('path-cell', 'home-col-' + color);
       });
     });
 
-    // Center
+    // Center — shows the last dice roll instead of a static icon.
     cellMap['7,7'].classList.add('center-cell');
-    cellMap['7,7'].textContent = '🏆';
+    const centerDie = document.createElement('div');
+    centerDie.id = 'center-die';
+    centerDie.className = 'center-die';
+    centerDie.innerHTML = '<span id="center-die-face" class="center-die-face">⚀</span><span class="center-die-label">Poslednji bacaj</span>';
+    cellMap['7,7'].appendChild(centerDie);
 
     boardEl.appendChild(grid);
 
@@ -613,6 +630,12 @@
       diceStatus.textContent = cp ? ('Čeka se ' + cp.name + '...') : 'Čeka igrače...';
     }
     diceButton.disabled = !myTurn || state.dice !== null || !!state.winner;
+
+    const centerFace = document.getElementById('center-die-face');
+    if (centerFace) {
+      centerFace.textContent = state.lastRoll ? DICE_GLYPHS[state.lastRoll] : '⚀';
+      centerFace.classList.toggle('has-roll', !!state.lastRoll);
+    }
 
     // Player cards
     const cardsWrap = $('#player-cards');
