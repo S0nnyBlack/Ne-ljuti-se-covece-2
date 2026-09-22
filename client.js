@@ -177,6 +177,15 @@
     }
   });
 
+  $('#btn-add-bot').addEventListener('click', () => {
+    lobbyError.textContent = '';
+    socket.emit('add_bot', {}, (res) => {
+      if (!res || !res.ok) {
+        lobbyError.textContent = (res && res.error) || 'Nije moguće dodati bota.';
+      }
+    });
+  });
+
   $('#btn-start-game').addEventListener('click', () => {
     lobbyError.textContent = '';
     socket.emit('start_game', {}, (res) => {
@@ -594,11 +603,14 @@
 
     const connectedCount = state.players.filter((p) => p.connected).length;
     const startBtn = $('#btn-start-game');
+    const addBotBtn = $('#btn-add-bot');
     const me = state.players.find((p) => p.id === myPlayerId);
     const iAmHost = me && me.isHost;
+    const slotCount = state.players.filter((p) => p.connected).length;
     startBtn.disabled = !(iAmHost && connectedCount >= 2);
+    addBotBtn.classList.toggle('hidden', !!state.solo || !iAmHost || slotCount >= 4);
     $('#lobby-hint').textContent = iAmHost
-      ? 'Potrebna su najmanje 2 igrača.'
+      ? (slotCount >= 4 ? 'Soba je puna (4 igrača).' : 'Dodaj igrače ili botove, pa pokreni igru.')
       : 'Čeka se da domaćin pokrene igru.';
 
     if (state.started) {
@@ -645,7 +657,7 @@
     cardsWrap.innerHTML = '';
     state.players.forEach((p, idx) => {
       const card = document.createElement('div');
-      card.className = 'player-card';
+      card.className = 'player-card' + (p.isBot ? ' bot-card' : '');
       card.style.setProperty('--player-color', cssColor(p.color));
       if (idx === state.currentPlayerIndex && !state.winner) card.classList.add('active-turn');
       if (!p.connected) card.classList.add('disconnected');
@@ -660,7 +672,7 @@
       card.innerHTML =
         '<span class="player-avatar">' + escapeHtml((p.name || '?').slice(0, 2).toUpperCase()) + '</span>' +
         '<span class="player-card-body">' +
-        '<span class="player-card-name">' + escapeHtml(p.name) + '</span>' +
+        '<span class="player-card-name">' + escapeHtml(p.name) + (p.isBot ? ' 🤖' : '') + '</span>' +
         '<span class="player-card-tokens">' + dotsHtml + '</span>' +
         (idx === state.currentPlayerIndex && !state.winner ? '<span class="player-card-turn-tag">' + (p.id === myPlayerId ? 'Tvoj red' : 'Na potezu') + '</span>' : '') +
         '</span>';
