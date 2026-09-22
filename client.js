@@ -53,6 +53,7 @@
   let myPlayerId = null;
   let myColor = null;
   let myRoomCode = null;
+  let myIsHost = false;
   let latestState = null;
   let boardBuilt = false;
 
@@ -117,6 +118,7 @@
       myPlayerId = res.playerId;
       myColor = res.color;
       myRoomCode = res.code;
+      myIsHost = true;
       showScreen('lobby');
     });
   });
@@ -131,6 +133,7 @@
       myPlayerId = res.playerId;
       myColor = res.color;
       myRoomCode = res.code;
+      myIsHost = true;
       showScreen('game');
     });
   });
@@ -150,6 +153,7 @@
       myPlayerId = res.playerId;
       myColor = res.color;
       myRoomCode = res.code;
+      myIsHost = false;
       showScreen('lobby');
     });
   });
@@ -605,7 +609,7 @@
     const startBtn = $('#btn-start-game');
     const addBotBtn = $('#btn-add-bot');
     const me = state.players.find((p) => p.id === myPlayerId);
-    const iAmHost = me && me.isHost;
+    const iAmHost = myIsHost || !!(me && me.isHost);
     const slotCount = state.players.filter((p) => p.connected).length;
     startBtn.disabled = !(iAmHost && connectedCount >= 2);
     addBotBtn.classList.toggle('hidden', !!state.solo || !iAmHost || slotCount >= 4);
