@@ -24,7 +24,7 @@ const COLOR_NAMES_SR = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 
 // Where each color starts on the shared 56-cell ring.
 const START_OFFSET = { red: 0, green: 14, yellow: 28, blue: 42 };
 const SHARED_LENGTH = 56;
-const HOME_COLUMN_LENGTH = 6;
+const HOME_COLUMN_LENGTH = 4;
 const STEPS_TO_ENTER_HOME = 51; // steps 0..50 are on the shared ring
 const FINISH_STEP = STEPS_TO_ENTER_HOME + HOME_COLUMN_LENGTH; // 57 = finished
 const MAX_PLAYERS = 4;
