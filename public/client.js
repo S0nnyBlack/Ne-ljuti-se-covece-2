@@ -428,7 +428,10 @@
         el.classList.add('corner-cell');
       }
       COLORS.forEach((color) => {
-        if (isStartCell(idx, color)) el.classList.add('start-' + color);
+        if (isStartCell(idx, color)) {
+          el.classList.add('start-' + color, 'start-cell');
+          el.setAttribute('aria-label', 'Početno polje - ' + COLOR_LABEL[color]);
+        }
       });
     });
 
@@ -436,6 +439,19 @@
     COLORS.forEach((color) => {
       HOME_COLUMNS[color].forEach(([r, c]) => {
         cellMap[r + ',' + c].classList.add('home-col-' + color);
+      });
+    });
+
+    // Visual connectors: red and blue finish lanes continue to the outer route.
+    const HOME_CONNECTORS = {
+      red: [[2,8],[3,8]],
+      green: [],
+      yellow: [],
+      blue: [[8,2],[8,3]],
+    };
+    COLORS.forEach((color) => {
+      HOME_CONNECTORS[color].forEach(([r, c]) => {
+        cellMap[r + ',' + c].classList.add('home-connector-' + color);
       });
     });
 
