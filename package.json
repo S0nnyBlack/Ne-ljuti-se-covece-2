@@ -1,0 +1,17 @@
+{
+  "name": "ne-ljuti-se-coveče-online",
+  "version": "2.0.0",
+  "description": "Ne ljuti se čoveče – Online Multiplayer Ludo (premium redesign)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
