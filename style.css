@@ -367,6 +367,14 @@ button { font-family: var(--font-body); }
 .slot-name { font-size: 0.92rem; }
 .slot-tag { display: block; font-size: 0.7rem; color: var(--text-muted); font-weight: 600; }
 
+.lobby-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lobby-actions #btn-add-bot {
+  width: 100%;
+}
 .lobby-hint { text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 
 /* ============================= GAME SCREEN ============================= */
