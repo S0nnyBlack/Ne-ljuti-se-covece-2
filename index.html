@@ -108,7 +108,10 @@
       <div class="slot" data-slot="3"><div class="slot-inner slot-empty">⚪ Čeka igrača...</div></div>
     </section>
 
-    <button id="btn-start-game" class="btn btn--primary btn--lg" disabled aria-label="Počni igru">Počni igru</button>
+    <div class="lobby-actions">
+      <button id="btn-add-bot" class="btn btn--secondary" aria-label="Dodaj bota">🤖 Dodaj bota</button>
+      <button id="btn-start-game" class="btn btn--primary btn--lg" disabled aria-label="Počni igru">Počni igru</button>
+    </div>
     <p id="lobby-hint" class="lobby-hint">Potrebna su najmanje 2 igrača.</p>
     <p id="lobby-error" class="field-error" role="alert" aria-live="assertive"></p>
     <button id="btn-leave-lobby" class="btn btn--ghost btn--sm">← Napusti sobu</button>
