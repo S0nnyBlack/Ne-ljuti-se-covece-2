@@ -1700,4 +1700,48 @@ body {
     height: calc(6 * (100% - (2 * var(--board-inset))) / 17) !important;
   }
 }
-
+/* Browser-safe exact yard sizing/alignment overrides */
+.board {
+  --yard-size: 32.61%;
+}
+.yard-box {
+  width: var(--yard-size) !important;
+  height: var(--yard-size) !important;
+}
+.yard-box--red {
+  left: 14.67% !important;
+  top: 14.67% !important;
+}
+.yard-box--green {
+  left: 58.20% !important;
+  top: 14.67% !important;
+}
+.yard-box--yellow {
+  left: 58.20% !important;
+  top: 58.20% !important;
+}
+.yard-box--blue {
+  left: 14.67% !important;
+  top: 58.20% !important;
+}
+@media (max-width: 820px) {
+  .board {
+    --yard-size: 29.65%;
+  }
+  .yard-box--red {
+    left: 17.88% !important;
+    top: 17.88% !important;
+  }
+  .yard-box--green {
+    left: 57.29% !important;
+    top: 17.88% !important;
+  }
+  .yard-box--yellow {
+    left: 57.29% !important;
+    top: 57.29% !important;
+  }
+  .yard-box--blue {
+    left: 17.88% !important;
+    top: 57.29% !important;
+  }
+}
