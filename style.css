@@ -1131,3 +1131,196 @@ body {
   }
 }
 
+
+/* =========================================================================
+   FINAL BOARD LAYOUT REFINEMENT
+   - no separate inner/back plate
+   - yards are compact and flush with the outer route
+   - token layer shares the exact 17x17 geometry with the board grid
+   - board and side panels are visually centered as one composition
+   ========================================================================= */
+
+.screen--game {
+  width: min(100%, 1460px);
+  max-width: 1460px;
+  margin: 0 auto;
+}
+
+.game-body {
+  grid-template-columns: 220px minmax(0, 760px) 220px;
+  justify-content: center;
+  align-items: stretch;
+}
+
+.board-wrap {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: none;
+}
+
+.board {
+  --board-inset: 3.8%;
+  --board-gap: 4px;
+  --cell: min(3.25vw, calc((100dvh - 132px) / 17), 44px);
+
+  width: calc(var(--cell) * 17);
+  height: calc(var(--cell) * 17);
+  max-width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  padding: 0;
+  overflow: hidden;
+
+  /* One centered game board surface — no secondary background board. */
+  background: #ead4aa;
+  border: 2px solid #7d4b29;
+  border-radius: 18px;
+  box-shadow:
+    0 18px 32px rgba(18, 7, 2, .34),
+    inset 0 0 0 2px rgba(255,255,255,.34);
+
+  transform: none;
+}
+
+.board::before,
+.board::after {
+  display: none !important;
+}
+
+.board-grid,
+.token-layer {
+  position: absolute;
+  inset: var(--board-inset);
+  display: grid;
+  grid-template-columns: repeat(17, minmax(0, 1fr));
+  grid-template-rows: repeat(17, minmax(0, 1fr));
+  gap: var(--board-gap);
+}
+
+.board-grid {
+  z-index: 1;
+}
+
+.token-layer {
+  z-index: 8;
+  pointer-events: none;
+}
+
+.cell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.yard-box {
+  z-index: 0;
+  opacity: 1;
+  width: 27.18% !important;
+  height: 27.18% !important;
+  border: 3px solid rgba(111,52,24,.75);
+  border-radius: 20px;
+  box-shadow:
+    0 7px 14px rgba(79,34,14,.24),
+    inset 0 0 0 3px rgba(255,239,210,.28),
+    inset 0 0 16px rgba(72,32,13,.12);
+}
+
+.yard-box--red {
+  left: 14.67% !important;
+  top: 14.67% !important;
+}
+
+.yard-box--green {
+  left: 58.15% !important;
+  top: 14.67% !important;
+}
+
+.yard-box--yellow {
+  left: 58.15% !important;
+  top: 58.15% !important;
+}
+
+.yard-box--blue {
+  left: 14.67% !important;
+  top: 58.15% !important;
+}
+
+.yard-slot-dot {
+  width: 32%;
+  height: 32%;
+}
+
+.token {
+  position: relative;
+  left: auto !important;
+  top: auto !important;
+  width: 72% !important;
+  height: 72% !important;
+  place-self: center;
+  transform-origin: center center;
+  pointer-events: none;
+  z-index: 8;
+}
+
+.token.movable {
+  pointer-events: auto;
+}
+
+.cell.center-cell {
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255,255,255,.34), transparent 28%),
+    conic-gradient(
+      #d84d42 0deg 90deg,
+      #4d82c5 90deg 180deg,
+      #e2b332 180deg 270deg,
+      #45a967 270deg 360deg
+    );
+}
+
+@media (max-width: 1099px) {
+  .game-body {
+    grid-template-columns: 220px minmax(0, 1fr);
+    justify-content: stretch;
+  }
+}
+
+@media (max-width: 820px) {
+  .screen--game {
+    width: 100%;
+    max-width: none;
+  }
+
+  .board {
+    --board-inset: 8%;
+    --cell: min(5.45vw, 34px);
+  }
+
+  .board-grid,
+  .token-layer {
+    inset: var(--board-inset);
+  }
+
+  .game-body {
+    grid-template-columns: 1fr;
+  }
+
+  .board-wrap {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .screen--game {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .board {
+    border-width: 2px;
+    border-radius: 16px;
+  }
+}
+
