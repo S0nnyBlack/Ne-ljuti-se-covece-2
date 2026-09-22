@@ -1817,3 +1817,60 @@ body {
 .cell.start-yellow::after { background: rgba(123,91,13,.62); }
 .cell.start-blue::after { background: rgba(39,73,122,.62); }
 
+
+/* =========================================================================
+   EXACTLY FOUR FINISH FIELDS
+   The finish lane itself is only the existing four HOME_COLUMNS cells.
+   Entry bridges are pseudo-elements, not extra board fields.
+   ========================================================================= */
+
+.cell.home-connector-red,
+.cell.home-connector-blue {
+  background: inherit !important;
+  border: inherit !important;
+  margin: 0 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.cell.home-entry-red,
+.cell.home-entry-blue {
+  position: relative;
+  overflow: visible;
+  z-index: 3;
+}
+
+/* Red finish lane enters from the top. */
+.cell.home-entry-red::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: -62%;
+  height: 64%;
+  border-radius: 12px 12px 4px 4px;
+  background: linear-gradient(180deg, #f4958b 0%, #d85249 55%, #b43e35 100%);
+  border: 2px solid #7c2e26;
+  box-shadow:
+    0 3px 6px rgba(73,28,10,.20),
+    inset 0 2px 3px rgba(255,255,255,.36);
+  pointer-events: none;
+}
+
+/* Blue finish lane enters from the left. */
+.cell.home-entry-blue::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: -62%;
+  width: 64%;
+  border-radius: 12px 4px 4px 12px;
+  background: linear-gradient(90deg, #8bb8ea 0%, #5f8fc9 55%, #3f6eae 100%);
+  border: 2px solid #2d5689;
+  box-shadow:
+    0 3px 6px rgba(35,38,48,.18),
+    inset 0 2px 3px rgba(255,255,255,.38);
+  pointer-events: none;
+}
+
