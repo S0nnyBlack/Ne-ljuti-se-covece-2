@@ -58,6 +58,8 @@
   let boardBuilt = false;
 
   const prefs = loadPrefs();
+  let autoPlayTimer = null;
+  let autoPlayKey = null;
   applyTheme(prefs.theme);
   applyReducedMotion(prefs.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -330,6 +332,7 @@
   $('#toggle-sound').checked = prefs.sound !== false;
   $('#toggle-animations').checked = prefs.animations !== false;
   $('#toggle-reduced-motion').checked = !!prefs.reducedMotion;
+  $('#toggle-autoplay').checked = prefs.autoplay === true;
 
   $('#toggle-sound').addEventListener('change', (e) => {
     prefs.sound = e.target.checked;
@@ -346,6 +349,13 @@
     applyReducedMotion(!prefs.animations || prefs.reducedMotion);
   });
 
+  $('#toggle-autoplay').addEventListener('change', (e) => {
+    prefs.autoplay = e.target.checked;
+    savePrefs(prefs);
+    cancelAutoPlay();
+    if (prefs.autoplay && latestState) scheduleAutoPlay(latestState);
+  });
+
   function applyTheme(theme) {
     document.body.setAttribute('data-theme', theme || 'dark');
   }
@@ -356,9 +366,9 @@
   function loadPrefs() {
     try {
       const raw = localStorage.getItem('ludo_prefs_v1');
-      return raw ? JSON.parse(raw) : { theme: 'dark', sound: true, animations: true };
+      return raw ? JSON.parse(raw) : { theme: 'dark', sound: true, animations: true, autoplay: false };
     } catch (e) {
-      return { theme: 'dark', sound: true, animations: true };
+      return { theme: 'dark', sound: true, animations: true, autoplay: false };
     }
   }
   function savePrefs(p) {
@@ -745,6 +755,80 @@
   }
 
   // ---------------------------------------------------------------------
+  // Auto play for the local player
+  // ---------------------------------------------------------------------
+  function cancelAutoPlay() {
+    if (autoPlayTimer) {
+      clearTimeout(autoPlayTimer);
+      autoPlayTimer = null;
+    }
+    autoPlayKey = null;
+  }
+
+  function chooseAutoMove(state, moves) {
+    // Prefer a token already in the home lane, then the furthest-progressed token.
+    if (!moves.length) return null;
+    const tokens = state.tokens[myColor] || [];
+    return moves.slice().sort((a, b) => {
+      const ta = tokens[a] || {};
+      const tb = tokens[b] || {};
+      const aLane = ta.state === 'active' && ta.step >= STEPS_TO_ENTER_HOME ? 1 : 0;
+      const bLane = tb.state === 'active' && tb.step >= STEPS_TO_ENTER_HOME ? 1 : 0;
+      if (aLane !== bLane) return bLane - aLane;
+      return (tb.step || -1) - (ta.step || -1);
+    })[0];
+  }
+
+  function scheduleAutoPlay(state) {
+    if (!prefs.autoplay || !state || !state.started || state.winner) {
+      cancelAutoPlay();
+      return;
+    }
+
+    const cp = state.players[state.currentPlayerIndex];
+    if (!cp || cp.id !== myPlayerId) {
+      cancelAutoPlay();
+      return;
+    }
+
+    const key = [state.code, myPlayerId, state.currentPlayerIndex, state.dice ?? 'none', state.lastRoll ?? 'none'].join(':');
+    if (autoPlayKey === key || autoPlayTimer) return;
+    autoPlayKey = key;
+
+    if (state.dice === null) {
+      autoPlayTimer = setTimeout(() => {
+        autoPlayTimer = null;
+        const latest = latestState;
+        const current = latest && latest.players[latest.currentPlayerIndex];
+        if (!prefs.autoplay || !latest || latest.winner || !current || current.id !== myPlayerId || latest.dice !== null) return;
+        socket.emit('roll_dice', {}, (res) => {
+          if (!res || !res.ok) {
+            autoPlayKey = null;
+            if (res && res.error) showToast(res.error);
+          }
+        });
+      }, 500);
+      return;
+    }
+
+    const moves = computeLocalMovableHint(state);
+    if (!moves.length) return; // server will pass the turn automatically.
+
+    const tokenIdx = chooseAutoMove(state, moves);
+    autoPlayTimer = setTimeout(() => {
+      autoPlayTimer = null;
+      const latest = latestState;
+      const current = latest && latest.players[latest.currentPlayerIndex];
+      if (!prefs.autoplay || !latest || latest.winner || !current || current.id !== myPlayerId || latest.dice === null) return;
+      const freshMoves = computeLocalMovableHint(latest);
+      if (!freshMoves.includes(tokenIdx)) return;
+      socket.emit('move_token', { tokenIdx }, (res) => {
+        if (!res || !res.ok) autoPlayKey = null;
+      });
+    }, 700);
+  }
+
+  // ---------------------------------------------------------------------
   // Socket state wiring
   // ---------------------------------------------------------------------
   let lastDiceValue = null;
@@ -767,6 +851,8 @@
       showScreen('game');
       renderGame(state);
     }
+
+    scheduleAutoPlay(state);
   });
 
   socket.on('connect_error', () => {
