@@ -21,9 +21,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const COLORS = ['red', 'green', 'yellow', 'blue'];
 const COLOR_NAMES_SR = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 'Plavi' };
-// Where each color starts on the shared 52-cell ring.
+// Where each color starts on the shared 56-cell ring.
 const START_OFFSET = { red: 0, green: 14, yellow: 28, blue: 42 };
-// Cells (relative to a color's own path, i.e. "step" numbers 0-50) that are safe stars.
 const SHARED_LENGTH = 56;
 const HOME_COLUMN_LENGTH = 6;
 const STEPS_TO_ENTER_HOME = 51; // steps 0..50 are on the shared ring
@@ -287,7 +286,7 @@ function logMoveEvents(room, events) {
 }
 
 function scheduleBotTurn(room) {
-  if (!room || !room.solo || !room.started || room.winner) return;
+  if (!room || !room.started || room.winner) return;
   clearTimeout(room.botTimer);
   room.botTimer = null;
 
@@ -300,7 +299,7 @@ function scheduleBotTurn(room) {
 }
 
 function botTakeTurn(room) {
-  if (!room || !rooms.has(room.code) || !room.solo || !room.started || room.winner) return;
+  if (!room || !rooms.has(room.code) || !room.started || room.winner) return;
   const bot = currentPlayer(room);
   if (!bot || !bot.isBot) return;
 
@@ -428,6 +427,54 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('add_bot', (payload, cb) => {
+    try {
+      const room = rooms.get(currentRoomCode);
+      if (!room) return cb && cb({ ok: false, error: 'Soba ne postoji.' });
+
+      const me = room.players.find((p) => p.id === currentPlayerId);
+      if (!me || !me.isHost) {
+        return cb && cb({ ok: false, error: 'Samo domaćin može dodati bota.' });
+      }
+      if (room.started) {
+        return cb && cb({ ok: false, error: 'Igra je već počela.' });
+      }
+      if (activePlayers(room).length >= MAX_PLAYERS) {
+        return cb && cb({ ok: false, error: 'Soba je puna.' });
+      }
+
+      const usedColors = new Set(room.players.map((p) => p.color));
+      const color = COLORS.find((c) => !usedColors.has(c));
+      if (!color) return cb && cb({ ok: false, error: 'Nema slobodne boje.' });
+
+      const existingBotCount = room.players.filter((p) => p.isBot).length;
+      const botNumber = existingBotCount + 1;
+      const botNames = {
+        red: 'BOT Crveni',
+        green: 'BOT Zeleni',
+        yellow: 'BOT Žuti',
+        blue: 'BOT Plavi',
+      };
+
+      const bot = {
+        id: `bot-${color}-${room.code}-${botNumber}`,
+        socketId: null,
+        name: botNames[color] || `BOT ${color}`,
+        color,
+        connected: true,
+        isHost: false,
+        isBot: true,
+      };
+
+      room.players.push(bot);
+      pushLog(room, `${bot.name} je dodat u sobu.`);
+      cb && cb({ ok: true, color, playerId: bot.id });
+      broadcastState(room);
+    } catch (err) {
+      cb && cb({ ok: false, error: 'Greška pri dodavanju bota.' });
+    }
+  });
+
   socket.on('join_room', (payload, cb) => {
     try {
       const name = sanitizeName(payload && payload.name) || 'Igrač';
@@ -487,6 +534,7 @@ io.on('connection', (socket) => {
     pushLog(room, 'Igra je počela! Srećno svima.');
     cb && cb({ ok: true });
     broadcastState(room);
+    scheduleBotTurn(room);
   });
 
   socket.on('roll_dice', (payload, cb) => {
