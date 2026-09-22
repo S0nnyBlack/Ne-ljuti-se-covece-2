@@ -10,46 +10,37 @@
   // ---------------------------------------------------------------------
   const COLORS = ['red', 'green', 'yellow', 'blue'];
   const COLOR_LABEL = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 'Plavi' };
-  const START_OFFSET = { red: 0, green: 13, yellow: 26, blue: 39 };
-  const SAFE_STEP_OFFSETS = [0, 8];
-  const SHARED_LENGTH = 52;
+  const START_OFFSET = { red: 0, green: 14, yellow: 28, blue: 42 };
+  const SHARED_LENGTH = 56;
   const STEPS_TO_ENTER_HOME = 51;
 
-  const PATH = [
-    [6,1],[6,2],[6,3],[6,4],[6,5],
-    [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
-    [0,7],
-    [0,8],[1,8],[2,8],[3,8],[4,8],[5,8],
-    [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
-    [7,14],
-    [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
-    [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
-    [14,7],
-    [14,6],[13,6],[12,6],[11,6],[10,6],[9,6],
-    [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
-    [7,0],
-    [6,0],
-  ];
+  // 56-cell clockwise outer track on a 17x17 board, including all 4 corner cells.
+  const PATH = (() => {
+    const cells = [];
+    for (let col = 8; col <= 15; col++) cells.push([1, col]);
+    for (let row = 2; row <= 15; row++) cells.push([row, 15]);
+    for (let col = 14; col >= 1; col--) cells.push([15, col]);
+    for (let row = 14; row >= 2; row--) cells.push([row, 1]);
+    for (let col = 1; col <= 7; col++) cells.push([1, col]);
+    return cells;
+  })();
 
   const HOME_COLUMNS = {
-    red: [[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
-    green: [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
-    yellow: [[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
-    blue: [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
+    red: [[2,8],[3,8],[4,8],[5,8],[6,8],[7,8]],
+    green: [[8,14],[8,13],[8,12],[8,11],[8,10],[8,9]],
+    yellow: [[14,8],[13,8],[12,8],[11,8],[10,8],[9,8]],
+    blue: [[8,2],[8,3],[8,4],[8,5],[8,6],[8,7]],
   };
 
   const YARD_SLOTS = {
-    red: [[1,1],[1,4],[4,1],[4,4]],
-    green: [[1,10],[1,13],[4,10],[4,13]],
-    yellow: [[10,10],[10,13],[13,10],[13,13]],
-    blue: [[10,1],[10,4],[13,1],[13,4]],
+    red: [[3,3],[3,5],[5,3],[5,5]],
+    green: [[3,11],[3,13],[5,11],[5,13]],
+    yellow: [[11,11],[11,13],[13,11],[13,13]],
+    blue: [[11,3],[11,5],[13,3],[13,5]],
   };
 
   function globalCellForStep(color, step) {
     return (START_OFFSET[color] + step) % SHARED_LENGTH;
-  }
-  function isSafeStep(step) {
-    return SAFE_STEP_OFFSETS.includes(step);
   }
   function isStartCell(cellIdx, color) {
     return cellIdx === START_OFFSET[color];
@@ -62,6 +53,7 @@
   let myPlayerId = null;
   let myColor = null;
   let myRoomCode = null;
+  let myIsHost = false;
   let latestState = null;
   let boardBuilt = false;
 
@@ -126,7 +118,23 @@
       myPlayerId = res.playerId;
       myColor = res.color;
       myRoomCode = res.code;
+      myIsHost = true;
       showScreen('lobby');
+    });
+  });
+
+  $('#btn-solo-mode').addEventListener('click', () => {
+    homeError.textContent = '';
+    socket.emit('create_solo', { name: playerNameOrDefault() }, (res) => {
+      if (!res || !res.ok) {
+        homeError.textContent = (res && res.error) || 'Nije moguće pokrenuti solo test.';
+        return;
+      }
+      myPlayerId = res.playerId;
+      myColor = res.color;
+      myRoomCode = res.code;
+      myIsHost = true;
+      showScreen('game');
     });
   });
 
@@ -145,6 +153,7 @@
       myPlayerId = res.playerId;
       myColor = res.color;
       myRoomCode = res.code;
+      myIsHost = false;
       showScreen('lobby');
     });
   });
@@ -170,6 +179,15 @@
     } catch (e) {
       showToast('Kopiranje nije uspelo.');
     }
+  });
+
+  $('#btn-add-bot').addEventListener('click', () => {
+    lobbyError.textContent = '';
+    socket.emit('add_bot', {}, (res) => {
+      if (!res || !res.ok) {
+        lobbyError.textContent = (res && res.error) || 'Nije moguće dodati bota.';
+      }
+    });
   });
 
   $('#btn-start-game').addEventListener('click', () => {
@@ -201,19 +219,6 @@
       if (!res || !res.ok) {
         diceButton.disabled = false;
         if (res && res.error) diceStatus.textContent = res.error;
-        return;
-      }
-      // Auto-play: if exactly one token can legally move, play it automatically
-      // so the person doesn't have to tap it manually.
-      if (res.moves && res.moves.length === 1) {
-        diceStatus.textContent = 'Automatski potez...';
-        setTimeout(() => {
-          socket.emit('move_token', { tokenIdx: res.moves[0] }, (moveRes) => {
-            if (!moveRes || !moveRes.ok) {
-              if (moveRes && moveRes.error) showToast(moveRes.error);
-            }
-          });
-        }, 550);
       }
     });
   });
@@ -289,7 +294,7 @@
     socket.emit('new_game', {}, (res) => {
       if (res && res.ok) {
         $('#winner-overlay').classList.add('hidden');
-        showScreen('lobby');
+        showScreen(latestState && latestState.solo ? 'game' : 'lobby');
       }
     });
   });
@@ -395,8 +400,8 @@
     grid.className = 'board-grid';
 
     const cellMap = {}; // "r,c" -> element
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 15; c++) {
+    for (let r = 0; r < 17; r++) {
+      for (let c = 0; c < 17; c++) {
         const div = document.createElement('div');
         div.className = 'cell';
         div.dataset.r = r; div.dataset.c = c;
@@ -409,37 +414,33 @@
     PATH.forEach(([r, c], idx) => {
       const el = cellMap[r + ',' + c];
       el.classList.add('path-cell');
-      if (SAFE_STEP_OFFSETS.some((off) => COLORS.some((color) => globalCellForStep(color, off) === idx))) {
-        el.classList.add('safe-cell');
+      if ((r === 1 && (c === 1 || c === 15)) || (r === 15 && (c === 1 || c === 15))) {
+        el.classList.add('corner-cell');
       }
       COLORS.forEach((color) => {
         if (isStartCell(idx, color)) el.classList.add('start-' + color);
       });
     });
 
-    // Home columns — reuse the "path-cell" dot styling, tinted per color.
+    // Home columns
     COLORS.forEach((color) => {
       HOME_COLUMNS[color].forEach(([r, c]) => {
-        cellMap[r + ',' + c].classList.add('path-cell', 'home-col-' + color);
+        cellMap[r + ',' + c].classList.add('home-col-' + color);
       });
     });
 
-    // Center — shows the last dice roll instead of a static icon.
+    // Center
     cellMap['7,7'].classList.add('center-cell');
-    const centerDie = document.createElement('div');
-    centerDie.id = 'center-die';
-    centerDie.className = 'center-die';
-    centerDie.innerHTML = '<span id="center-die-face" class="center-die-face">⚀</span><span class="center-die-label">Poslednji bacaj</span>';
-    cellMap['7,7'].appendChild(centerDie);
+    cellMap['7,7'].textContent = '🏆';
 
     boardEl.appendChild(grid);
 
     // Yard decoration boxes (behind the grid, purely visual)
     const yardBoxes = [
-      { color: 'red', r0: 0, c0: 0 },
-      { color: 'green', r0: 0, c0: 9 },
-      { color: 'yellow', r0: 9, c0: 9 },
-      { color: 'blue', r0: 9, c0: 0 },
+      { color: 'red', r0: 2, c0: 2 },
+      { color: 'green', r0: 2, c0: 10 },
+      { color: 'yellow', r0: 10, c0: 10 },
+      { color: 'blue', r0: 10, c0: 2 },
     ];
     yardBoxes.forEach(({ color, r0, c0 }) => {
       const box = document.createElement('div');
@@ -469,7 +470,7 @@
   }
 
   function cellToPercentPos([r, c]) {
-    return { left: ((c + 0.5) / 15) * 100, top: ((r + 0.5) / 15) * 100 };
+    return { left: ((c + 0.5) / 17) * 100, top: ((r + 0.5) / 17) * 100 };
   }
 
   function tokenGridPos(color, tokenIdx, tokenState) {
@@ -548,12 +549,33 @@
     const tokens = state.tokens[myColor] || [];
     const dice = state.dice;
     const moves = [];
+    if (!dice) return moves;
+
+    const ownOccupies = (cell, excludeIdx) => tokens.some((t, idx) => {
+      if (idx === excludeIdx || t.state !== 'active' || t.step > STEPS_TO_ENTER_HOME - 1) return false;
+      return globalCellForStep(myColor, t.step) === cell;
+    });
+
     tokens.forEach((t, idx) => {
       if (t.state === 'home') return;
-      if (t.state === 'yard') { if (dice === 6) moves.push(idx); return; }
+
+      if (t.state === 'yard') {
+        if (dice === 6 && !ownOccupies(globalCellForStep(myColor, 0), idx)) moves.push(idx);
+        return;
+      }
+
       if (t.state === 'active') {
         const newStep = t.step + dice;
-        if (newStep <= 57) moves.push(idx);
+        if (newStep > 57) return;
+
+        if (newStep <= STEPS_TO_ENTER_HOME - 1) {
+          if (!ownOccupies(globalCellForStep(myColor, newStep), idx)) moves.push(idx);
+        } else {
+          const occupiedHome = tokens.some((other, otherIdx) =>
+            otherIdx !== idx && other.state === 'active' && other.step === newStep
+          );
+          if (!occupiedHome) moves.push(idx);
+        }
       }
     });
     return moves;
@@ -585,11 +607,18 @@
 
     const connectedCount = state.players.filter((p) => p.connected).length;
     const startBtn = $('#btn-start-game');
+    const addBotBtn = $('#btn-add-bot');
     const me = state.players.find((p) => p.id === myPlayerId);
-    const iAmHost = me && me.isHost;
+    const iAmHost = myIsHost || !!(me && me.isHost);
+    const slotCount = state.players.filter((p) => p.connected).length;
     startBtn.disabled = !(iAmHost && connectedCount >= 2);
+    addBotBtn.classList.toggle('hidden', !!state.solo);
+    addBotBtn.disabled = !iAmHost || slotCount >= 4;
+    addBotBtn.title = !iAmHost
+      ? 'Samo domaćin može da doda bota.'
+      : (slotCount >= 4 ? 'Soba je puna.' : 'Dodaj bota u sobu.');
     $('#lobby-hint').textContent = iAmHost
-      ? 'Potrebna su najmanje 2 igrača.'
+      ? (slotCount >= 4 ? 'Soba je puna (4 igrača).' : 'Dodaj igrače ili botove, pa pokreni igru.')
       : 'Čeka se da domaćin pokrene igru.';
 
     if (state.started) {
@@ -631,18 +660,12 @@
     }
     diceButton.disabled = !myTurn || state.dice !== null || !!state.winner;
 
-    const centerFace = document.getElementById('center-die-face');
-    if (centerFace) {
-      centerFace.textContent = state.lastRoll ? DICE_GLYPHS[state.lastRoll] : '⚀';
-      centerFace.classList.toggle('has-roll', !!state.lastRoll);
-    }
-
     // Player cards
     const cardsWrap = $('#player-cards');
     cardsWrap.innerHTML = '';
     state.players.forEach((p, idx) => {
       const card = document.createElement('div');
-      card.className = 'player-card';
+      card.className = 'player-card' + (p.isBot ? ' bot-card' : '');
       card.style.setProperty('--player-color', cssColor(p.color));
       if (idx === state.currentPlayerIndex && !state.winner) card.classList.add('active-turn');
       if (!p.connected) card.classList.add('disconnected');
@@ -657,7 +680,7 @@
       card.innerHTML =
         '<span class="player-avatar">' + escapeHtml((p.name || '?').slice(0, 2).toUpperCase()) + '</span>' +
         '<span class="player-card-body">' +
-        '<span class="player-card-name">' + escapeHtml(p.name) + '</span>' +
+        '<span class="player-card-name">' + escapeHtml(p.name) + (p.isBot ? ' 🤖' : '') + '</span>' +
         '<span class="player-card-tokens">' + dotsHtml + '</span>' +
         (idx === state.currentPlayerIndex && !state.winner ? '<span class="player-card-turn-tag">' + (p.id === myPlayerId ? 'Tvoj red' : 'Na potezu') + '</span>' : '') +
         '</span>';
