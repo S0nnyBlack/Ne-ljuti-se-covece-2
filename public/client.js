@@ -6,7 +6,7 @@
   'use strict';
 
   // ---------------------------------------------------------------------
-  // Board geometry (15x15 grid). Must stay in sync with server step math.
+  // Board geometry (17x17 grid). Must stay in sync with server step math.
   // ---------------------------------------------------------------------
   const COLORS = ['red', 'green', 'yellow', 'blue'];
   const COLOR_LABEL = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 'Plavi' };
@@ -14,7 +14,7 @@
   const SHARED_LENGTH = 56;
   const STEPS_TO_ENTER_HOME = 51;
 
-  // 56-cell clockwise outer track on a 17x17 board, including all 4 corner cells.
+  // 56-cell clockwise outer track on the 17x17 board.
   const PATH = (() => {
     const cells = [];
     for (let col = 8; col <= 15; col++) cells.push([1, col]);
