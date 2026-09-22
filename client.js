@@ -612,7 +612,11 @@
     const iAmHost = myIsHost || !!(me && me.isHost);
     const slotCount = state.players.filter((p) => p.connected).length;
     startBtn.disabled = !(iAmHost && connectedCount >= 2);
-    addBotBtn.classList.toggle('hidden', !!state.solo || !iAmHost || slotCount >= 4);
+    addBotBtn.classList.toggle('hidden', !!state.solo);
+    addBotBtn.disabled = !iAmHost || slotCount >= 4;
+    addBotBtn.title = !iAmHost
+      ? 'Samo domaćin može da doda bota.'
+      : (slotCount >= 4 ? 'Soba je puna.' : 'Dodaj bota u sobu.');
     $('#lobby-hint').textContent = iAmHost
       ? (slotCount >= 4 ? 'Soba je puna (4 igrača).' : 'Dodaj igrače ili botove, pa pokreni igru.')
       : 'Čeka se da domaćin pokrene igru.';
