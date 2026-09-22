@@ -442,17 +442,17 @@
       });
     });
 
-    // Visual connectors: red and blue finish lanes continue to the outer route.
-    const HOME_CONNECTORS = {
-      red: [[2,8],[3,8]],
-      green: [],
-      yellow: [],
-      blue: [[8,2],[8,3]],
+    // Mark the first of the four real finish fields so CSS can visually
+    // bridge it to the outer route without creating extra finish fields.
+    const HOME_ENTRIES = {
+      red: [4,8],
+      green: [8,14],
+      yellow: [14,8],
+      blue: [8,4],
     };
     COLORS.forEach((color) => {
-      HOME_CONNECTORS[color].forEach(([r, c]) => {
-        cellMap[r + ',' + c].classList.add('home-connector-' + color);
-      });
+      const [r, c] = HOME_ENTRIES[color];
+      cellMap[r + ',' + c].classList.add('home-entry-' + color);
     });
 
     // Center
