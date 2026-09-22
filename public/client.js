@@ -459,8 +459,8 @@
       YARD_SLOTS[color].forEach(([r, c]) => {
         const dot = document.createElement('div');
         dot.className = 'yard-slot-dot';
-        dot.style.left = 'calc(((' + (c - c0) + ' + 0.5) * (100% / 5)) - 16%)';
-        dot.style.top = 'calc(((' + (r - r0) + ' + 0.5) * (100% / 5)) - 16%)';
+        dot.style.left = 'calc(((' + (c - c0) + ' + 0.5) * (100% / 6)) - 16%)';
+        dot.style.top = 'calc(((' + (r - r0) + ' + 0.5) * (100% / 6)) - 16%)';
         box.appendChild(dot);
       });
     });
