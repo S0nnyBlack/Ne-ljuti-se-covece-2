@@ -514,7 +514,7 @@
         const el = document.createElement('div');
         el.className = 'token token--' + item.color;
         if (group.length > 1) el.classList.add('stack-' + Math.min(group.length, 4));
-        const cellPct = 100 / 15;
+        const cellPct = 100 / 17;
         const size = cellPct * 0.62;
         el.style.width = size + '%';
         el.style.height = size + '%';
