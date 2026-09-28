@@ -11,6 +11,7 @@ let session = null;
 let state = null;
 let events = null;
 let busy = false;
+let entryView = 'home';
 let toastTimer;
 
 function toast(message) {
@@ -123,6 +124,7 @@ function renderPlayers() {
 }
 
 function renderDice() {
+  $('#modeSeats').textContent = `${state?.seats || 4} igrača`;
   const die = state?.roll || (state?.lastAction?.type === 'roll' ? state.lastAction.die : state?.lastAction?.die) || 1;
   $('#diceFace').replaceChildren(...pipMap[die].map(([x, y]) => {
     const pip = document.createElement('i');
@@ -145,13 +147,38 @@ function renderDice() {
 }
 
 function render() {
-  $('#sessionActions').hidden = !!session;
-  $('#sessionActive').hidden = !session;
-  $('#roomCode').hidden = !session;
-  $('#roomCode').textContent = session ? `Soba ${session.id}` : '';
-  $('#mySeat').textContent = session ? `Igraš kao ${names[session.seat]}` : '';
-  $('#sessionStatus').textContent = !session ? 'Unesi ime i izaberi kako želiš da igraš.' : !state ? 'Učitavanje partije…' : state.phase === 'lobby' ? `Čeka se još ${state.seats - state.players.filter(Boolean).length} igrača.` : state.phase === 'finished' ? 'Partija je završena.' : `Partija je u toku. ${state.players[state.current].name} je na potezu.`;
+  const view = session ? (!state || state.phase === 'lobby' ? 'lobby' : 'game') : entryView;
+  for (const name of ['home', 'setup', 'lobby', 'game']) $(`#${name}View`).hidden = name !== view;
+  if (view === 'lobby') renderLobby();
   renderPlayers(); renderDice(); renderPieces();
+}
+
+function renderLobby() {
+  const joined = state?.players.filter(Boolean).length || 1;
+  $('#lobbyCount').textContent = `${joined}/${state?.seats || 4} igrača`;
+  $('#roomCode').textContent = session?.id || '';
+  $('#mySeat').textContent = session ? `Igraš kao ${names[session.seat]}${session.seat === 0 ? ' · domaćin' : ''}` : '';
+  $('#startBtn').hidden = session?.seat !== 0;
+  $('#startBtn').disabled = busy || !state || joined < 2;
+  $('#lobbyWait').textContent = !state ? 'Učitavanje sobe…' : joined < 2 ? 'Potrebna su najmanje dva igrača.' : session.seat === 0 ? 'Možeš pokrenuti partiju ili sačekati ostale.' : 'Čeka se da domaćin pokrene partiju.';
+  const slots = $('#lobbyPlayers');
+  slots.replaceChildren();
+  for (let seat = 0; seat < (state?.seats || 4); seat++) {
+    const player = state?.players[seat];
+    const row = document.createElement('div');
+    row.className = `lobby-player ${seat === 0 && player ? 'is-host' : ''} ${player ? '' : 'is-empty'}`;
+    const avatar = document.createElement('span');
+    avatar.className = 'lobby-avatar';
+    avatar.textContent = player ? player.name.slice(0, 1).toUpperCase() : '·';
+    const info = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = player ? `${player.name}${seat === 0 ? ' ★' : ''}` : 'Čeka igrača…';
+    const subtitle = document.createElement('small');
+    subtitle.textContent = player ? names[seat] : 'Slobodno mesto';
+    info.append(title, subtitle);
+    row.append(avatar, info);
+    slots.append(row);
+  }
 }
 
 async function api(url, method = 'GET', payload, token) {
@@ -167,6 +194,18 @@ async function api(url, method = 'GET', payload, token) {
 
 function receive(next) {
   if (!state || next.revision >= state.revision) {
+    if (session?.playerId) {
+      const seat = next.players.findIndex(player => player?.id === session.playerId);
+      if (seat < 0) {
+        events?.close(); session = null; state = null; entryView = 'setup';
+        localStorage.removeItem(storageKey); history.replaceState(null, '', '/'); render();
+        return;
+      }
+      if (seat !== session.seat) {
+        session.seat = seat;
+        localStorage.setItem(storageKey, JSON.stringify(session));
+      }
+    }
     const previous = state?.revision;
     state = next;
     render();
@@ -180,13 +219,13 @@ function connect() {
   if (!session) return;
   events = new EventSource(`/api/games/${session.id}/events`);
   events.addEventListener('state', event => receive(JSON.parse(event.data)));
-  events.onerror = () => { $('#sessionStatus').textContent = 'Veza se obnavlja…'; };
+  events.onerror = () => { if (state?.phase === 'lobby') $('#lobbyWait').textContent = 'Veza se obnavlja…'; };
 }
 
 async function establish(result) {
   events?.close();
   state = null;
-  session = { id: result.id, token: result.token, seat: result.seat };
+  session = { id: result.id, token: result.token, seat: result.seat, playerId: result.state.players[result.seat].id };
   localStorage.setItem(storageKey, JSON.stringify(session));
   history.replaceState(null, '', `?room=${result.id}`);
   receive(result.state);
@@ -210,17 +249,25 @@ $('#createBtn').onclick = () => submit(async () => {
 $('#joinBtn').onclick = () => submit(async () => {
   const id = $('#joinCode').value.trim().toLowerCase().replace(/^.*room=/, '');
   if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unesi pun kod sobe ili pozivni link.');
-  const result = await api(`/api/games/${id}/join`, 'POST', { name: $('#playerName').value.trim() || 'Igrač' });
+  const result = await api(`/api/games/${id}/join`, 'POST', { name: $('#joinName').value.trim() || 'Igrač' });
   establish(result);
 });
+$('#enterOnline').onclick = () => { entryView = 'setup'; render(); };
+$('#backHome').onclick = () => { entryView = 'home'; render(); };
+$('#startBtn').onclick = () => submit(() => api(`/api/games/${session.id}/start`, 'POST', {}, session.token));
 $('#copyBtn').onclick = async () => {
   try { await navigator.clipboard.writeText(`${location.origin}/?room=${session.id}`); toast('Pozivnica je kopirana.'); }
   catch { toast(`Kod sobe: ${session.id}`); }
 };
 $('#leaveBtn').onclick = () => {
-  modal('Napusti prikaz?', 'Možeš se vratiti samo ako sačuvaš svoj pristupni token. Tvoje mesto u partiji ostaje zauzeto.', [
+  modal('Napusti sobu?', 'Tvoje mesto će biti oslobođeno. Ako si domaćin, sledeći igrač preuzima sobu.', [
     { label: 'Odustani' },
-    { label: 'Napusti', primary: true, run: () => { events?.close(); session = null; state = null; localStorage.removeItem(storageKey); history.replaceState(null, '', '/'); render(); } }
+    { label: 'Napusti', primary: true, run: () => submit(async () => {
+      const leaving = session;
+      await api(`/api/games/${leaving.id}/leave`, 'POST', {}, leaving.token);
+      events?.close(); session = null; state = null; entryView = 'setup';
+      localStorage.removeItem(storageKey); history.replaceState(null, '', '/');
+    }) }
   ]);
 };
 $('#resetBtn').onclick = () => {
@@ -237,15 +284,18 @@ $('#board').onclick = event => {
   const piece = event.target.closest('.piece');
   if (piece && !piece.disabled) submit(() => api(`/api/games/${session.id}/move`, 'POST', { piece: Number(piece.dataset.piece) }, session.token));
 };
-$('#rulesLink').onclick = event => {
+function showRules(event) {
   event.preventDefault();
   modal('Kako se igra', 'Igrači igraju naizmenično. Šestica izvodi figuru iz kućice i daje novo bacanje. Izaberi osvetljenu figuru. Ako staneš na protivničku figuru van obojenih početnih polja, vraćaš je u kućicu i ponovo bacaš. Za cilj je potreban tačan broj koraka. Pobeđuje igrač koji prvi uvede sve četiri figure.', [{ label: 'Razumem', primary: true }]);
-};
+}
+$('#rulesLink').onclick = showRules;
+$('#homeRules').onclick = showRules;
 $('#modalBg').onclick = event => { if (event.target.id === 'modalBg') $('#modalBg').classList.remove('show'); };
 document.addEventListener('keydown', event => { if (event.key === 'Escape') $('#modalBg').classList.remove('show'); });
 
 buildBoard();
 $('#joinCode').value = new URLSearchParams(location.search).get('room') || '';
+if ($('#joinCode').value) entryView = 'setup';
 try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
 if (session && /^[a-f0-9]{32}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
   api(`/api/games/${session.id}`).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });

@@ -3,7 +3,7 @@ import path from "node:path";
 import { mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, createReadStream, statSync } from "node:fs";
 import { randomBytes, randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { GameError, newGame, join, roll, move, publicGame } from "./game.js";
+import { GameError, newGame, join, leave, start, roll, move, publicGame } from "./game.js";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const idPattern = /^[a-f0-9]{32}$/;
@@ -60,10 +60,10 @@ export function createApp({ dataDir = path.join(root, "data"), rng = () => rando
     try {
       const url = new URL(req.url, "http://localhost");
       const parts = url.pathname.split("/").filter(Boolean);
-      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/app.js")) {
-        const file = url.pathname === "/app.js" ? "app.js" : "index.html";
+      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/app.js" || url.pathname === "/menu.css")) {
+        const file = url.pathname === "/app.js" ? "app.js" : url.pathname === "/menu.css" ? "menu.css" : "index.html";
         const target = path.join(root, "public", file);
-        const contentType = file.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8";
+        const contentType = file.endsWith(".js") ? "text/javascript; charset=utf-8" : file.endsWith(".css") ? "text/css; charset=utf-8" : "text/html; charset=utf-8";
         res.writeHead(200, { "content-type": contentType, "content-length": statSync(target).size });
         createReadStream(target).pipe(res);
         return;
@@ -104,7 +104,14 @@ export function createApp({ dataDir = path.join(root, "data"), rng = () => rando
         return send(res, 201, { id: record.id, seat, token, state: publicGame(record.game) });
       }
       const seat = auth(req, record);
-      if (action === "roll") {
+      if (action === "leave") {
+        await body(req);
+        leave(record.game, seat);
+        record.tokens.splice(seat, 1);
+      } else if (action === "start") {
+        await body(req);
+        start(record.game, seat);
+      } else if (action === "roll") {
         await body(req);
         roll(record.game, seat, rng());
       } else if (action === "move") {

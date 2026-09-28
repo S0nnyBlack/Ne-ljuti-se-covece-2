@@ -1,10 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { newGame, join, roll, move, legalMoves } from "./game.js";
+import { newGame, join, leave, start, roll, move, legalMoves } from "./game.js";
 
 function started(seats = 2) {
   const game = newGame(seats);
   for (let i = 0; i < seats; i++) join(game, `player-${i}`, `Igrač ${i + 1}`);
+  start(game, 0);
   return game;
 }
 
@@ -13,11 +14,39 @@ test("soba počinje tek kada se popuni, a potez pripada aktivnom igraču", () =>
   join(game, "one", "Prvi");
   assert.equal(game.phase, "lobby");
   join(game, "two", "Drugi");
+  assert.equal(game.phase, "lobby");
+  assert.throws(() => start(game, 1), /Samo domaćin/);
+  start(game, 0);
   assert.equal(game.phase, "await-roll");
   assert.throws(() => roll(game, 1, 6), /Nije vaš potez/);
   roll(game, 0, 3);
   assert.equal(game.current, 1);
   assert.equal(game.turn, 2);
+});
+
+test("domaćin može početi sa dva od četiri mesta; posle toga se ne može ući", () => {
+  const game = newGame(4);
+  join(game, "one", "Prvi");
+  assert.throws(() => start(game, 0), /najmanje dva/);
+  join(game, "two", "Drugi");
+  start(game, 0);
+  assert.equal(game.seats, 2);
+  assert.equal(game.players.length, 2);
+  assert.throws(() => join(game, "three", "Treći"), /već počela/);
+});
+
+test("napuštanje čekaonice oslobađa mesto i prenosi domaćina", () => {
+  const game = newGame(4);
+  join(game, "one", "Prvi");
+  join(game, "two", "Drugi");
+  join(game, "three", "Treći");
+  leave(game, 0);
+  assert.equal(game.players[0].id, "two");
+  assert.equal(game.players[0].color, "red");
+  assert.equal(game.players[1].id, "three");
+  assert.equal(join(game, "four", "Četvrti"), 2);
+  start(game, 0);
+  assert.equal(game.seats, 3);
 });
 
 test("šestica izvodi figuru i daje novo bacanje", () => {

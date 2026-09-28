@@ -24,10 +24,36 @@ export function join(game, playerId, name) {
   const seat = game.players.findIndex(p => p === null);
   if (seat < 0) throw new GameError("Soba je puna.");
   game.players[seat] = { id: playerId, name: name.trim(), color: COLORS[seat] };
-  if (game.players.every(Boolean)) game.phase = "await-roll";
   game.revision++;
   game.lastAction = { type: "join", seat };
   return seat;
+}
+
+export function start(game, seat) {
+  if (game.phase !== "lobby") throw new GameError("Partija je već počela.");
+  if (seat !== 0) throw new GameError("Samo domaćin može pokrenuti partiju.");
+  const joined = game.players.filter(Boolean).length;
+  if (joined < 2) throw new GameError("Potrebna su najmanje dva igrača.");
+  game.seats = joined;
+  game.players.length = joined;
+  game.pieces.length = joined;
+  game.phase = "await-roll";
+  game.revision++;
+  game.lastAction = { type: "start", seat, players: joined };
+  return game.lastAction;
+}
+
+export function leave(game, seat) {
+  if (game.phase !== "lobby") throw new GameError("Partija je već počela.");
+  if (!Number.isInteger(seat) || !game.players[seat]) throw new GameError("Igrač nije u sobi.");
+  game.players.splice(seat, 1);
+  game.players.push(null);
+  game.pieces.splice(seat, 1);
+  game.pieces.push([-1, -1, -1, -1]);
+  game.players.forEach((player, index) => { if (player) player.color = COLORS[index]; });
+  game.revision++;
+  game.lastAction = { type: "leave", seat };
+  return game.lastAction;
 }
 
 export function legalMoves(game) {

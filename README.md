@@ -11,7 +11,7 @@ npm test
 npm start
 ```
 
-Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Igrač napravi sobu i pošalje pozivni link ostalima. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. Soba počinje kada se popune sva izabrana mesta. „Nova partija” pravi novu sobu.
+Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Početni ekran vodi na online sto sa odvojenim karticama za kreiranje i pridruživanje. Domaćin u čekaonici deli pozivni link i pokreće partiju kada se pridruže najmanje dva igrača. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. „Nova partija” pravi novu sobu.
 
 ## Pravila
 
@@ -27,9 +27,9 @@ Ovo su pravila iz vizuelnog prototipa. Pre takmičarske upotrebe potvrditi varij
 
 - `game.js`: čista pravila i prelazi stanja.
 - `server.js`: HTTP API, serversko bacanje kockice, tokeni igrača, SSE obaveštenja i čuvanje partija.
-- `public/index.html` i `public/app.js`: tabla i online tok kreiranja/pridruživanja.
+- `public/index.html`, `public/menu.css` i `public/app.js`: početni meni, online sto, čekaonica i tabla.
 - `game.test.js` i `server.test.js`: pravila i API provere.
 
-API: `POST /api/games` (`name`, `seats`), `POST /api/games/:id/join` (`name`), `GET /api/games/:id`, `GET /api/games/:id/events`, `POST /api/games/:id/roll` (`{}`), `POST /api/games/:id/move` (`piece`). Akcije igrača koriste `Authorization: Bearer <token>`. `GET /health` vraća status servera. SSE šalje `state` događaj pri povezivanju i posle svake promene. Ko ima kod sobe može da vidi stanje.
+API: `POST /api/games` (`name`, `seats`), `POST /api/games/:id/join` (`name`), `POST /api/games/:id/start` (`{}`), `GET /api/games/:id`, `GET /api/games/:id/events`, `POST /api/games/:id/roll` (`{}`), `POST /api/games/:id/move` (`piece`). Akcije igrača koriste `Authorization: Bearer <token>`. Samo domaćin može da pokrene partiju. `GET /health` vraća status servera. SSE šalje `state` događaj pri povezivanju i posle svake promene. Ko ima kod sobe može da vidi stanje.
 
-Partije se čuvaju u `data/` kao JSON i učitavaju pri restartu procesa. Taj direktorijum mora biti na trajnom disku i ne sme se javno služiti. Jedan proces treba da poseduje direktorijum; više instanci zahteva zajedničku bazu i transakcije. Pre javnog hostovanja preporučeni su HTTPS, ograničenje broja zahteva i politika čišćenja starih partija. Server trenutno ne uklanja zauzeto mesto ako igrač trajno napusti partiju.
+Partije se čuvaju u `data/` kao JSON i učitavaju pri restartu procesa. Taj direktorijum mora biti na trajnom disku i ne sme se javno služiti. Jedan proces treba da poseduje direktorijum; više instanci zahteva zajedničku bazu i transakcije. Napuštanje čekaonice oslobađa mesto i prenosi domaćinstvo sledećem igraču. Pre javnog hostovanja preporučeni su HTTPS, ograničenje broja zahteva i politika čišćenja starih partija. Server trenutno ne uklanja zauzeto mesto ako igrač trajno ode iz započete partije.
