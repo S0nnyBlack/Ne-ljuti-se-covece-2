@@ -1,702 +1,126 @@
-/**
- * Ne ljuti se čoveče – Online (server.js)
- * Server-authoritative multiplayer Ludo ("Parcheesi"-style) game.
- * Node.js + Express + Socket.io. No database — everything lives in memory.
- */
+import http from "node:http";
+import path from "node:path";
+import { mkdirSync, readFileSync, writeFileSync, renameSync, readdirSync, createReadStream, statSync } from "node:fs";
+import { randomBytes, randomInt } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { GameError, newGame, join, roll, move, publicGame } from "./game.js";
 
-const path = require('path');
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const root = path.dirname(fileURLToPath(import.meta.url));
+const idPattern = /^[a-f0-9]{32}$/;
+const bearer = /^Bearer ([a-f0-9]{64})$/;
+const jsonHeaders = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-// ---------------------------------------------------------------------------
-// Game constants
-// ---------------------------------------------------------------------------
-
-const COLORS = ['red', 'green', 'yellow', 'blue'];
-const COLOR_NAMES_SR = { red: 'Crveni', green: 'Zeleni', yellow: 'Žuti', blue: 'Plavi' };
-// Where each color starts on the shared 56-cell ring.
-const START_OFFSET = { red: 0, green: 14, yellow: 28, blue: 42 };
-const SHARED_LENGTH = 56;
-const HOME_COLUMN_LENGTH = 4;
-const STEPS_TO_ENTER_HOME = 51; // steps 0..50 are on the shared ring
-const FINISH_STEP = STEPS_TO_ENTER_HOME + HOME_COLUMN_LENGTH; // 57 = finished
-const MAX_PLAYERS = 4;
-const MAX_CHAT_LEN = 200;
-const MAX_NAME_LEN = 18;
-const CHAT_RATE_MS = 700;
-const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-/** @type {Map<string, Room>} */
-const rooms = new Map();
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeRoomCode() {
-  let code;
-  do {
-    code = Array.from({ length: 4 }, () => ROOM_CODE_CHARS[Math.floor(Math.random() * ROOM_CODE_CHARS.length)]).join('');
-  } while (rooms.has(code));
-  return code;
+function send(res, status, value) {
+  res.writeHead(status, jsonHeaders);
+  res.end(JSON.stringify(value));
 }
 
-function sanitizeName(raw) {
-  if (typeof raw !== 'string') return '';
-  return raw.replace(/[<>]/g, '').trim().slice(0, MAX_NAME_LEN);
-}
-
-function sanitizeChat(raw) {
-  if (typeof raw !== 'string') return '';
-  return raw.replace(/[<>]/g, '').trim().slice(0, MAX_CHAT_LEN);
-}
-
-function globalCellForStep(color, step) {
-  // Only meaningful while step is on the shared ring (0..50)
-  return (START_OFFSET[color] + step) % SHARED_LENGTH;
-}
-
-function newRoom(code, hostSocketId) {
-  return {
-    code,
-    createdAt: Date.now(),
-    solo: false,
-    players: [], // { id, socketId, name, color, connected, isHost }
-    started: false,
-    currentPlayerIndex: 0,
-    dice: null,
-    lastRoll: null, // persists for display purposes even after `dice` is cleared
-    rolling: false,
-    consecutiveSixes: 0,
-    tokens: {}, // color -> [ {state:'yard'|'active'|'home', step:number, slot:number} x4 ]
-    log: [],
-    winner: null,
-    lastChatAt: {}, // playerId -> timestamp
-    botTimer: null,
-  };
-}
-
-function initTokens(room) {
-  room.tokens = {};
-  for (const color of COLORS) {
-    room.tokens[color] = [0, 1, 2, 3].map((slot) => ({ state: 'yard', step: -1, slot }));
+async function body(req) {
+  if (!req.headers["content-type"]?.startsWith("application/json")) throw new GameError("Očekuje se JSON zahtev.");
+  let raw = "";
+  for await (const chunk of req) {
+    raw += chunk;
+    if (raw.length > 4096) throw new GameError("Zahtev je prevelik.");
   }
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch { throw new GameError("Neispravan JSON zahtev."); }
 }
 
-function pushLog(room, message) {
-  room.log.push({ message, at: Date.now() });
-  if (room.log.length > 60) room.log.shift();
-}
-
-function publicRoomState(room) {
-  return {
-    code: room.code,
-    started: room.started,
-    currentPlayerIndex: room.currentPlayerIndex,
-    dice: room.dice,
-    lastRoll: room.lastRoll,
-    rolling: room.rolling,
-    winner: room.winner,
-    solo: !!room.solo,
-    players: room.players.map((p) => ({
-      id: p.id,
-      name: p.name,
-      color: p.color,
-      connected: p.connected,
-      isHost: p.isHost,
-      isBot: !!p.isBot,
-    })),
-    tokens: room.tokens,
-    log: room.log.slice(-40),
-  };
-}
-
-function broadcastState(room) {
-  io.to(room.code).emit('room_state', publicRoomState(room));
-}
-
-function activePlayers(room) {
-  return room.players.filter((p) => p.connected);
-}
-
-function currentPlayer(room) {
-  return room.players[room.currentPlayerIndex] || null;
-}
-
-function playerTokens(room, color) {
-  return room.tokens[color];
-}
-
-/** Compute which of a color's tokens can legally move with a given dice value. */
-function ownTokenOccupiesGlobalCell(room, color, cell, excludeTokenIdx = -1) {
-  return (room.tokens[color] || []).some((t, idx) => {
-    if (idx === excludeTokenIdx || t.state !== 'active') return false;
-    return t.step <= STEPS_TO_ENTER_HOME - 1 && globalCellForStep(color, t.step) === cell;
-  });
-}
-
-function legalMoves(room, color, diceValue) {
-  const moves = [];
-  const tokens = playerTokens(room, color);
-
-  tokens.forEach((t, idx) => {
-    if (t.state === 'home') return;
-
-    if (t.state === 'yard') {
-      if (diceValue === 6 && !ownTokenOccupiesGlobalCell(room, color, globalCellForStep(color, 0))) {
-        moves.push(idx);
-      }
-      return;
-    }
-
-    if (t.state === 'active') {
-      const newStep = t.step + diceValue;
-      if (newStep > FINISH_STEP) return;
-
-      if (newStep <= STEPS_TO_ENTER_HOME - 1) {
-        const destinationCell = globalCellForStep(color, newStep);
-        if (!ownTokenOccupiesGlobalCell(room, color, destinationCell, idx)) {
-          moves.push(idx);
-        }
-      } else {
-        // Home column fields are also single-occupancy.
-        const occupied = tokens.some((other, otherIdx) =>
-          otherIdx !== idx && other.state === 'active' && other.step === newStep
-        );
-        if (!occupied) moves.push(idx);
-      }
-    }
-  });
-
-  return moves;
-}
-
-function tokensOccupyingGlobalCell(room, cell, excludeColor) {
-  const occupants = [];
-  for (const color of COLORS) {
-    if (color === excludeColor) continue;
-    room.tokens[color].forEach((t, idx) => {
-      if (t.state === 'active' && t.step <= STEPS_TO_ENTER_HOME - 1 && globalCellForStep(color, t.step) === cell) {
-        occupants.push({ color, idx });
-      }
-    });
-  }
-  return occupants;
-}
-
-function applyMove(room, color, tokenIdx, diceValue) {
-  const token = room.tokens[color][tokenIdx];
-  const events = [];
-
-  if (token.state === 'yard') {
-    token.state = 'active';
-    token.step = 0;
-    events.push({ type: 'exit', color, tokenIdx });
-  } else {
-    token.step += diceValue;
-    if (token.step >= FINISH_STEP) {
-      token.step = FINISH_STEP;
-      token.state = 'home';
-      events.push({ type: 'finish', color, tokenIdx });
-    } else {
-      events.push({ type: 'move', color, tokenIdx, step: token.step });
-    }
-  }
-
-  // Capture check — only while on the shared ring, and not on a safe cell.
-  if (token.state === 'active' && token.step <= STEPS_TO_ENTER_HOME - 1) {
-    const cell = globalCellForStep(color, token.step);
-    const occupants = tokensOccupyingGlobalCell(room, cell, color);
-    for (const occ of occupants) {
-      const captured = room.tokens[occ.color][occ.idx];
-      captured.state = 'yard';
-      captured.step = -1;
-      events.push({ type: 'capture', color, tokenIdx, capturedColor: occ.color, capturedIdx: occ.idx });
-    }
-  }
-
-  return events;
-}
-
-function allTokensHome(room, color) {
-  return room.tokens[color].every((t) => t.state === 'home');
-}
-
-function advanceTurn(room, keepTurn) {
-  if (keepTurn) {
-    room.dice = null;
-    scheduleBotTurn(room);
-    return;
-  }
-  const n = room.players.length;
-  if (n === 0) return;
-  let next = room.currentPlayerIndex;
-  for (let i = 0; i < n; i++) {
-    next = (next + 1) % n;
-    if (room.players[next].connected) break;
-  }
-  room.currentPlayerIndex = next;
-  room.dice = null;
-  room.consecutiveSixes = 0;
-  scheduleBotTurn(room);
-}
-
-function nameFor(room, color) {
-  const p = room.players.find((pl) => pl.color === color);
-  return p ? p.name : COLOR_NAMES_SR[color];
-}
-
-function cleanupEmptyRoomsTick() {
-  const now = Date.now();
-  for (const [code, room] of rooms) {
-    const allGone = room.players.every((p) => !p.connected);
-    if (allGone && now - (room.emptiedAt || room.createdAt) > 5 * 60 * 1000) {
-      rooms.delete(code);
-    } else if (allGone && !room.emptiedAt) {
-      room.emptiedAt = now;
-    } else if (!allGone) {
-      room.emptiedAt = null;
-    }
-  }
-}
-setInterval(cleanupEmptyRoomsTick, 60 * 1000);
-
-
-// ---------------------------------------------------------------------------
-// Solo mode / bot helpers
-// ---------------------------------------------------------------------------
-
-function logMoveEvents(room, events) {
-  for (const ev of events) {
-    if (ev.type === 'capture') {
-      pushLog(room, `${nameFor(room, ev.color)} je pojeo/la figuru igrača ${nameFor(room, ev.capturedColor)}!`);
-    } else if (ev.type === 'finish') {
-      pushLog(room, `${nameFor(room, ev.color)} je doveo/la figuru kući!`);
-    } else if (ev.type === 'exit') {
-      pushLog(room, `${nameFor(room, ev.color)} je izveo/la figuru iz dvorišta.`);
-    }
-  }
-}
-
-function scheduleBotTurn(room) {
-  if (!room || !room.started || room.winner) return;
-  clearTimeout(room.botTimer);
-  room.botTimer = null;
-
-  const player = currentPlayer(room);
-  if (!player || !player.isBot) return;
-
-  room.botTimer = setTimeout(() => {
-    botTakeTurn(room);
-  }, 850);
-}
-
-function botTakeTurn(room) {
-  if (!room || !rooms.has(room.code) || !room.started || room.winner) return;
-  const bot = currentPlayer(room);
-  if (!bot || !bot.isBot) return;
-
-  const value = 1 + Math.floor(Math.random() * 6);
-  room.dice = value;
-  room.lastRoll = value;
-  if (value === 6) room.consecutiveSixes += 1;
-  else room.consecutiveSixes = 0;
-
-  pushLog(room, `${bot.name} je bacio/la ${value}.`);
-  broadcastState(room);
-
-  room.botTimer = setTimeout(() => {
-    if (!rooms.has(room.code) || room.currentPlayerIndex !== room.players.findIndex((p) => p.id === bot.id) || room.winner) return;
-
-    const moves = legalMoves(room, bot.color, value);
-    if (moves.length === 0) {
-      pushLog(room, `${bot.name} nema legalan potez.`);
-      advanceTurn(room, false);
-      broadcastState(room);
-      return;
-    }
-
-    const tokenIdx = moves[Math.floor(Math.random() * moves.length)];
-    const events = applyMove(room, bot.color, tokenIdx, value);
-    logMoveEvents(room, events);
-
-    let wonNow = false;
-    if (allTokensHome(room, bot.color)) {
-      room.winner = { color: bot.color, name: bot.name };
-      pushLog(room, `🏆 ${bot.name} je pobednik!`);
-      wonNow = true;
-    }
-
-    const gotAnotherTurn = !wonNow && value === 6 && room.consecutiveSixes < 3;
-    advanceTurn(room, gotAnotherTurn);
-    broadcastState(room);
-  }, 650);
-}
-
-// ---------------------------------------------------------------------------
-// Socket.io handlers
-// ---------------------------------------------------------------------------
-
-io.on('connection', (socket) => {
-  let currentRoomCode = null;
-  let currentPlayerId = null;
-
-  socket.on('create_room', (payload, cb) => {
+export function createApp({ dataDir = path.join(root, "data"), rng = () => randomInt(1, 7) } = {}) {
+  mkdirSync(dataDir, { recursive: true });
+  const games = new Map();
+  const listeners = new Map();
+  for (const file of readdirSync(dataDir)) {
+    if (!idPattern.test(file.replace(/\.json$/, "")) || !file.endsWith(".json")) continue;
     try {
-      const name = sanitizeName(payload && payload.name) || 'Igrač';
-      const code = makeRoomCode();
-      const room = newRoom(code, socket.id);
-      initTokens(room);
-
-      const player = {
-        id: socket.id,
-        socketId: socket.id,
-        name,
-        color: COLORS[0],
-        connected: true,
-        isHost: true,
-        isBot: false,
-      };
-      room.players.push(player);
-      rooms.set(code, room);
-
-      socket.join(code);
-      currentRoomCode = code;
-      currentPlayerId = player.id;
-
-      pushLog(room, `${name} je napravio/la sobu.`);
-      cb && cb({ ok: true, code, playerId: player.id, color: player.color });
-      broadcastState(room);
-    } catch (err) {
-      cb && cb({ ok: false, error: 'Greška pri kreiranju sobe.' });
-    }
-  });
-
-  socket.on('create_solo', (payload, cb) => {
+      const record = JSON.parse(readFileSync(path.join(dataDir, file), "utf8"));
+      if (record.id === file.slice(0, -5) && record.game?.version === 1 && Array.isArray(record.tokens)) games.set(record.id, record);
+    } catch { /* Oštećen fajl ostaje na disku radi oporavka. */ }
+  }
+  function save(record) {
+    const target = path.join(dataDir, `${record.id}.json`);
+    const temp = path.join(dataDir, `${record.id}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`);
+    writeFileSync(temp, JSON.stringify(record), { mode: 0o600 });
+    renameSync(temp, target);
+  }
+  function publish(record) {
+    const payload = `event: state\ndata: ${JSON.stringify(publicGame(record.game))}\n\n`;
+    for (const res of listeners.get(record.id) || []) res.write(payload);
+  }
+  function auth(req, record) {
+    const token = bearer.exec(req.headers.authorization || "")?.[1];
+    const seat = record.tokens.indexOf(token);
+    if (seat < 0) throw new GameError("Nevažeći pristupni token.");
+    return seat;
+  }
+  const server = http.createServer(async (req, res) => {
     try {
-      const name = sanitizeName(payload && payload.name) || 'Igrač';
-      const code = makeRoomCode();
-      const room = newRoom(code, socket.id);
-      room.solo = true;
-      room.started = true;
-      initTokens(room);
-
-      const human = {
-        id: socket.id,
-        socketId: socket.id,
-        name,
-        color: COLORS[0],
-        connected: true,
-        isHost: true,
-        isBot: false,
-      };
-      room.players.push(human);
-
-      const botNames = { green: 'BOT Zeleni', yellow: 'BOT Žuti', blue: 'BOT Plavi' };
-      for (let i = 1; i < COLORS.length; i++) {
-        const color = COLORS[i];
-        room.players.push({
-          id: `bot-${color}-${code}`,
-          socketId: null,
-          name: botNames[color],
-          color,
-          connected: true,
-          isHost: false,
-          isBot: true,
-        });
-      }
-
-      rooms.set(code, room);
-      socket.join(code);
-      currentRoomCode = code;
-      currentPlayerId = human.id;
-
-      pushLog(room, 'Solo test je pokrenut. Igraš protiv 3 bota.');
-      cb && cb({ ok: true, code, playerId: human.id, color: human.color, solo: true });
-      broadcastState(room);
-      scheduleBotTurn(room);
-    } catch (err) {
-      cb && cb({ ok: false, error: 'Greška pri pokretanju solo testa.' });
-    }
-  });
-
-  socket.on('add_bot', (payload, cb) => {
-    try {
-      const room = rooms.get(currentRoomCode);
-      if (!room) return cb && cb({ ok: false, error: 'Soba ne postoji.' });
-
-      const me = room.players.find((p) => p.id === currentPlayerId);
-      if (!me || !me.isHost) {
-        return cb && cb({ ok: false, error: 'Samo domaćin može dodati bota.' });
-      }
-      if (room.started) {
-        return cb && cb({ ok: false, error: 'Igra je već počela.' });
-      }
-      if (activePlayers(room).length >= MAX_PLAYERS) {
-        return cb && cb({ ok: false, error: 'Soba je puna.' });
-      }
-
-      const usedColors = new Set(room.players.map((p) => p.color));
-      const color = COLORS.find((c) => !usedColors.has(c));
-      if (!color) return cb && cb({ ok: false, error: 'Nema slobodne boje.' });
-
-      const existingBotCount = room.players.filter((p) => p.isBot).length;
-      const botNumber = existingBotCount + 1;
-      const botNames = {
-        red: 'BOT Crveni',
-        green: 'BOT Zeleni',
-        yellow: 'BOT Žuti',
-        blue: 'BOT Plavi',
-      };
-
-      const bot = {
-        id: `bot-${color}-${room.code}-${botNumber}`,
-        socketId: null,
-        name: botNames[color] || `BOT ${color}`,
-        color,
-        connected: true,
-        isHost: false,
-        isBot: true,
-      };
-
-      room.players.push(bot);
-      pushLog(room, `${bot.name} je dodat u sobu.`);
-      cb && cb({ ok: true, color, playerId: bot.id });
-      broadcastState(room);
-    } catch (err) {
-      cb && cb({ ok: false, error: 'Greška pri dodavanju bota.' });
-    }
-  });
-
-  socket.on('join_room', (payload, cb) => {
-    try {
-      const name = sanitizeName(payload && payload.name) || 'Igrač';
-      const code = String((payload && payload.code) || '').toUpperCase().trim();
-      const room = rooms.get(code);
-
-      if (!room) {
-        cb && cb({ ok: false, error: 'Soba ne postoji.' });
+      const url = new URL(req.url, "http://localhost");
+      const parts = url.pathname.split("/").filter(Boolean);
+      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html" || url.pathname === "/app.js")) {
+        const file = url.pathname === "/app.js" ? "app.js" : "index.html";
+        const target = path.join(root, "public", file);
+        const contentType = file.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8";
+        res.writeHead(200, { "content-type": contentType, "content-length": statSync(target).size });
+        createReadStream(target).pipe(res);
         return;
       }
-      if (room.started) {
-        cb && cb({ ok: false, error: 'Igra je već počela.' });
+      if (req.method === "GET" && url.pathname === "/health") return send(res, 200, { ok: true, service: "covece-server" });
+      if (req.method === "POST" && url.pathname === "/api/games") {
+        const input = await body(req);
+        const game = newGame(input.seats ?? 4);
+        const id = randomBytes(16).toString("hex");
+        const token = randomBytes(32).toString("hex");
+        join(game, randomBytes(16).toString("hex"), input.name);
+        const record = { id, game, tokens: [token] };
+        games.set(id, record);
+        save(record);
+        return send(res, 201, { id, seat: 0, token, state: publicGame(game) });
+      }
+      if (parts[0] !== "api" || parts[1] !== "games" || !idPattern.test(parts[2] || "")) return send(res, 404, { error: "Ruta ne postoji." });
+      const record = games.get(parts[2]);
+      if (!record) return send(res, 404, { error: "Partija ne postoji." });
+      if (req.method === "GET" && parts.length === 3) return send(res, 200, publicGame(record.game));
+      if (req.method === "GET" && parts[3] === "events" && parts.length === 4) {
+        res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
+        res.write(`event: state\ndata: ${JSON.stringify(publicGame(record.game))}\n\n`);
+        if (!listeners.has(record.id)) listeners.set(record.id, new Set());
+        listeners.get(record.id).add(res);
+        const ping = setInterval(() => res.write(": keepalive\n\n"), 25000);
+        req.on("close", () => { clearInterval(ping); listeners.get(record.id)?.delete(res); });
         return;
       }
-      if (activePlayers(room).length >= MAX_PLAYERS) {
-        cb && cb({ ok: false, error: 'Soba je puna.' });
-        return;
+      if (req.method !== "POST" || parts.length !== 4) return send(res, 404, { error: "Ruta ne postoji." });
+      const action = parts[3];
+      if (action === "join") {
+        const input = await body(req);
+        const token = randomBytes(32).toString("hex");
+        const seat = join(record.game, randomBytes(16).toString("hex"), input.name);
+        record.tokens[seat] = token;
+        save(record); publish(record);
+        return send(res, 201, { id: record.id, seat, token, state: publicGame(record.game) });
       }
-
-      const usedColors = new Set(room.players.map((p) => p.color));
-      const color = COLORS.find((c) => !usedColors.has(c));
-
-      const player = {
-        id: socket.id,
-        socketId: socket.id,
-        name,
-        color,
-        connected: true,
-        isHost: false,
-        isBot: false,
-      };
-      room.players.push(player);
-
-      socket.join(code);
-      currentRoomCode = code;
-      currentPlayerId = player.id;
-
-      pushLog(room, `${name} se pridružio/la sobi.`);
-      cb && cb({ ok: true, code, playerId: player.id, color: player.color });
-      broadcastState(room);
-    } catch (err) {
-      cb && cb({ ok: false, error: 'Greška pri pridruživanju.' });
+      const seat = auth(req, record);
+      if (action === "roll") {
+        await body(req);
+        roll(record.game, seat, rng());
+      } else if (action === "move") {
+        const input = await body(req);
+        move(record.game, seat, input.piece);
+      } else return send(res, 404, { error: "Ruta ne postoji." });
+      save(record); publish(record);
+      return send(res, 200, publicGame(record.game));
+    } catch (error) {
+      return send(res, error instanceof GameError ? 400 : 500, { error: error instanceof GameError ? error.message : "Greška servera." });
     }
   });
+  return server;
+}
 
-  socket.on('start_game', (payload, cb) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room) return cb && cb({ ok: false, error: 'Soba ne postoji.' });
-    const me = room.players.find((p) => p.id === currentPlayerId);
-    if (!me || !me.isHost) return cb && cb({ ok: false, error: 'Samo domaćin može pokrenuti igru.' });
-    if (room.started) return cb && cb({ ok: false, error: 'Igra je već počela.' });
-    if (activePlayers(room).length < 2) return cb && cb({ ok: false, error: 'Potrebna su najmanje 2 igrača.' });
-
-    room.started = true;
-    room.currentPlayerIndex = 0;
-    room.dice = null;
-    pushLog(room, 'Igra je počela! Srećno svima.');
-    cb && cb({ ok: true });
-    broadcastState(room);
-    scheduleBotTurn(room);
-  });
-
-  socket.on('roll_dice', (payload, cb) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room || !room.started || room.winner) return cb && cb({ ok: false });
-    const me = currentPlayer(room);
-    if (!me || me.id !== currentPlayerId) return cb && cb({ ok: false, error: 'Nije tvoj red.' });
-    if (room.dice !== null) return cb && cb({ ok: false, error: 'Već si bacio/la kocku.' });
-
-    const value = 1 + Math.floor(Math.random() * 6);
-    room.dice = value;
-    room.lastRoll = value;
-    if (value === 6) room.consecutiveSixes += 1;
-    else room.consecutiveSixes = 0;
-
-    const moves = legalMoves(room, me.color, value);
-    pushLog(room, `${me.name} je bacio/la ${value}.`);
-
-    if (moves.length === 0) {
-      // No legal moves — pass the turn (three-sixes-in-a-row also forfeits).
-      const forfeitBySixes = room.consecutiveSixes >= 3;
-      if (forfeitBySixes) pushLog(room, `${me.name} je bacio/la tri šestice zaredom — red prelazi dalje.`);
-      setTimeout(() => {
-        if (!rooms.has(room.code)) return;
-        pushLog(room, `${me.name} nema legalan potez.`);
-        advanceTurn(room, false);
-        broadcastState(room);
-      }, 650);
-    }
-
-    cb && cb({ ok: true, value, moves });
-    broadcastState(room);
-  });
-
-  socket.on('move_token', (payload, cb) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room || !room.started || room.winner) return cb && cb({ ok: false });
-    const me = currentPlayer(room);
-    if (!me || me.id !== currentPlayerId) return cb && cb({ ok: false, error: 'Nije tvoj red.' });
-    if (room.dice === null) return cb && cb({ ok: false, error: 'Prvo baci kocku.' });
-
-    const tokenIdx = Number(payload && payload.tokenIdx);
-    const moves = legalMoves(room, me.color, room.dice);
-    if (!moves.includes(tokenIdx)) {
-      return cb && cb({ ok: false, error: 'Nelegalan potez.' });
-    }
-
-    const diceValue = room.dice;
-    const events = applyMove(room, me.color, tokenIdx, diceValue);
-
-    for (const ev of events) {
-      if (ev.type === 'capture') {
-        pushLog(room, `${nameFor(room, ev.color)} je pojeo/la figuru igrača ${nameFor(room, ev.capturedColor)}!`);
-      } else if (ev.type === 'finish') {
-        pushLog(room, `${nameFor(room, ev.color)} je doveo/la figuru kući!`);
-      } else if (ev.type === 'exit') {
-        pushLog(room, `${nameFor(room, ev.color)} je izveo/la figuru iz dvorišta.`);
-      }
-    }
-
-    let wonNow = false;
-    if (allTokensHome(room, me.color)) {
-      room.winner = { color: me.color, name: me.name };
-      pushLog(room, `🏆 ${me.name} je pobednik!`);
-      wonNow = true;
-    }
-
-    const gotAnotherTurn = !wonNow && (diceValue === 6 && room.consecutiveSixes < 3);
-    advanceTurn(room, gotAnotherTurn && !wonNow);
-
-    cb && cb({ ok: true });
-    broadcastState(room);
-  });
-
-  socket.on('new_game', (payload, cb) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room) return cb && cb({ ok: false });
-    const me = room.players.find((p) => p.id === currentPlayerId);
-    if (!me || !me.isHost) return cb && cb({ ok: false, error: 'Samo domaćin može započeti novu igru.' });
-
-    clearTimeout(room.botTimer);
-    room.botTimer = null;
-    room.winner = null;
-    room.dice = null;
-    room.lastRoll = null;
-    room.currentPlayerIndex = 0;
-    room.consecutiveSixes = 0;
-    initTokens(room);
-    room.log = [];
-
-    if (room.solo) {
-      room.started = true;
-      pushLog(room, 'Nova solo igra je spremna. Igraš protiv 3 bota.');
-      cb && cb({ ok: true, solo: true });
-      broadcastState(room);
-      scheduleBotTurn(room);
-    } else {
-      room.started = false;
-      pushLog(room, 'Nova igra je spremna. Domaćin može ponovo pokrenuti igru.');
-      cb && cb({ ok: true, solo: false });
-      broadcastState(room);
-    }
-  });
-
-  socket.on('send_chat_message', (payload) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room) return;
-    const me = room.players.find((p) => p.id === currentPlayerId);
-    if (!me) return;
-
-    const now = Date.now();
-    const last = room.lastChatAt[me.id] || 0;
-    if (now - last < CHAT_RATE_MS) return; // basic rate limiting
-    room.lastChatAt[me.id] = now;
-
-    const text = sanitizeChat(payload && payload.text);
-    if (!text) return;
-
-    io.to(room.code).emit('chat_message', {
-      playerId: me.id,
-      name: me.name,
-      color: me.color,
-      text,
-      at: now,
-    });
-  });
-
-  socket.on('send_reaction', (payload) => {
-    const room = rooms.get(currentRoomCode);
-    if (!room) return;
-    const me = room.players.find((p) => p.id === currentPlayerId);
-    if (!me) return;
-    const allowed = ['😀', '😂', '🔥', '👑', '😭', '🎉'];
-    const emoji = allowed.includes(payload && payload.emoji) ? payload.emoji : null;
-    if (!emoji) return;
-    io.to(room.code).emit('reaction', { playerId: me.id, name: me.name, color: me.color, emoji });
-  });
-
-  socket.on('disconnect', () => {
-    const room = rooms.get(currentRoomCode);
-    if (!room) return;
-    const me = room.players.find((p) => p.id === currentPlayerId);
-    if (!me) return;
-    me.connected = false;
-    pushLog(room, `${me.name} je napustio/la sobu.`);
-
-    // Reassign host if the host left.
-    if (me.isHost) {
-      const nextHost = room.players.find((p) => p.connected);
-      if (nextHost) nextHost.isHost = true;
-    }
-
-    // If it was this player's turn, move on so the game doesn't stall.
-    if (room.started && !room.winner && currentPlayer(room) && currentPlayer(room).id === me.id) {
-      advanceTurn(room, false);
-    }
-
-    broadcastState(room);
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Ne ljuti se čoveče – Online server sluša na portu ${PORT}`);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const port = Number(process.env.PORT || 3000);
+  createApp().listen(port, process.env.HOST || "0.0.0.0", () => console.log(`Čoveče server sluša na portu ${port}`));
+}
