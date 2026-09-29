@@ -217,6 +217,27 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.match(client, /options\.append\(button\)/);
 });
 
+test('the server serves every module imported by the browser app', async t => {
+  const f = await fixture(t);
+  const pending = ['/app.js'];
+  const seen = new Set();
+  while (pending.length) {
+    const route = pending.shift();
+    if (seen.has(route)) continue;
+    seen.add(route);
+    const response = await fetch(f.url(route));
+    assert.equal(response.status, 200, `Missing browser module: ${route}`);
+    assert.match(response.headers.get('content-type'), /^text\/javascript/);
+    const source = await response.text();
+    for (const match of source.matchAll(/^import\s+.+?\s+from\s+['"]([^'"]+)['"];?/gm)) {
+      pending.push(new URL(match[1], f.url(route)).pathname);
+    }
+  }
+  assert.ok(seen.has('/solo-storage.js'));
+  assert.ok(seen.has('/piece-motion.js'));
+  assert.ok(seen.has('/game-feed.js'));
+});
+
 test('Render deployment uses its public URL unless a custom URL is configured', async t => {
   assert.equal(resolvePublicUrl({ RENDER_EXTERNAL_URL: 'https://game.onrender.com' }), 'https://game.onrender.com');
   assert.equal(resolvePublicUrl({ PUBLIC_URL: 'https://play.example', RENDER_EXTERNAL_URL: 'https://game.onrender.com' }), 'https://play.example');
