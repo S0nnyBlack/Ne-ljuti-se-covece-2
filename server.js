@@ -9,6 +9,7 @@ import { RoomStore, RateLimiter, RoomError, codePattern, hashToken, fail } from 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const bearer = /^Bearer ([a-f0-9]{64})$/;
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
+export const resolvePublicUrl = (env = process.env) => env.PUBLIC_URL || env.RENDER_EXTERNAL_URL;
 function send(res, status, value) {
   res.writeHead(status, jsonHeaders);
   res.end(JSON.stringify(value));
@@ -30,7 +31,7 @@ async function body(req) {
 }
 
 export function createApp({ dataDir = path.join(root, 'data'), rng = () => randomInt(1, 7), now = Date.now,
-  limits, persist, publicUrl = process.env.PUBLIC_URL } = {}) {
+  limits, persist, publicUrl = resolvePublicUrl() } = {}) {
   if (publicUrl) {
     const url = new URL(publicUrl);
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new TypeError('PUBLIC_URL must be an HTTP(S) URL without credentials');
@@ -174,7 +175,9 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
   return server;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  if (process.env.NODE_ENV === 'production' && !process.env.PUBLIC_URL) throw new Error('PUBLIC_URL is required in production');
+  if (process.env.NODE_ENV === 'production' && !resolvePublicUrl()) {
+    throw new Error('PUBLIC_URL or RENDER_EXTERNAL_URL is required in production');
+  }
   const port = Number(process.env.PORT || 3000);
   createApp().listen(port, process.env.HOST || '0.0.0.0', () => console.log(`Čoveče server sluša na portu ${port}`));
 }
