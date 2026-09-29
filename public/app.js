@@ -134,6 +134,9 @@ function renderPlayers() {
 
 function renderDice() {
   $('#modeSeats').textContent = `${state?.seats || 4} igrača`;
+  $('#modeType').textContent = session?.solo ? 'solo' : 'online';
+  $('#gameStatusLabel').textContent = session?.solo ? 'Solo igra' : 'Online igra';
+  $('#gameFooterMode').textContent = `Arena Games · ${session?.solo ? 'solo' : 'online'} partija`;
   const die = state?.roll || state?.lastAction?.die || 1;
   $('#diceFace').replaceChildren(...pipMap[die].map(([x, y]) => {
     const pip = document.createElement('i');
@@ -157,9 +160,22 @@ function renderDice() {
   $('#rollBtn').disabled = busy || !session || !state || !['await-roll', 'choose-starter'].includes(state.phase) || state.current !== session.seat;
   $('#rollBtn').textContent = finished ? 'Partija završena' : state?.phase === 'await-move' ? 'Izaberi figuru' : waiting ? 'Čekamo igrače' :
     state?.current !== session?.seat ? 'Čekaj svoj red' : choosingStarter ? 'Baci za početak' : 'Baci kockicu';
+  const choosingPiece = state?.phase === 'await-move' && state.current === session?.seat;
+  $('#rollBtn').hidden = choosingPiece;
+  const options = $('#moveOptions');
+  options.hidden = !choosingPiece;
+  options.replaceChildren();
+  if (choosingPiece) for (const piece of state.legalMoves) {
+    const button = document.createElement('button');
+    button.textContent = `Figura ${piece + 1}`;
+    button.setAttribute('aria-label', `Pomeri figuru ${piece + 1}`);
+    button.disabled = busy;
+    button.onclick = () => submit(() => command('move', { piece }));
+    options.append(button);
+  }
   $('#helpText').textContent = waiting ? 'Podeli pozivnicu drugim igračima.' : choosingStarter ?
     'Svi bacaju jednom; najviši broj počinje. Izjednačeni ponovo bacaju.' : finished ? 'Za novu partiju napravi novu sobu.' :
-    state?.phase === 'await-move' ? 'Klikni osvetljenu figuru na tabli.' :
+    state?.phase === 'await-move' ? 'Izaberi figuru dugmetom ili dodirni označenu figuru na tabli.' :
     state?.openingAttempts ? `Još ${3 - state.openingAttempts} pokušaja za šesticu.` : 'Šestica izvodi figuru iz kućice.';
 }
 
@@ -404,10 +420,11 @@ $('#board').onclick = event => {
 };
 function showRules(event) {
   event.preventDefault();
+  $('.mobile-menu').open = false;
   modal('Kako se igra', 'Svaki igrač ima četiri figure. Svi bacaju za početak: najviši broj počinje, a izjednačeni ponovo bacaju. Šestica izvodi figuru iz kuće i daje novo bacanje. Kada su ti sve preostale figure u kući, imaš do tri pokušaja da dobiješ šesticu. Kreći se u smeru kazaljke na satu. Ne možeš stati na svoju figuru, osim u zajedničkom cilju. Na protivničku figuru možeš stati i na obojenom startu: vraćaš je u kuću i ponovo bacaš. Za cilj je potreban tačan broj koraka. Pobeđuje prvi sa sve četiri figure u cilju.', [{ label: 'Razumem', primary: true }]);
 }
 $('#rulesLink').onclick = showRules;
-$('#homeRules').onclick = showRules;
+$('#mobileRules').onclick = showRules;
 $('#modalBg').onclick = event => { if (event.target.id === 'modalBg') $('#modalBg').classList.remove('show'); };
 document.addEventListener('keydown', event => { if (event.key === 'Escape') $('#modalBg').classList.remove('show'); });
 

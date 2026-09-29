@@ -48,3 +48,88 @@
 #startBtn { min-height: 54px; font-size: 16px; }
 @media (max-width: 820px) { .setup-grid { grid-template-columns: 1fr; } .mode-row { flex-wrap: wrap; } .mode-row .menu-button { flex: 1 1 100%; } }
 @media (max-width: 640px) { .menu-view { margin-top: 20px; } .menu-card { padding: 17px; } .mode-row { gap: 12px; } .mode-icon { width: 48px; height: 48px; flex-basis: 48px; } .rules-teaser { flex-wrap: wrap; } .rules-teaser .menu-button { width: 100%; } .lobby-view { margin-top: 20px; } .lobby-players { grid-template-columns: 1fr; } }
+
+/* Keep the game and its entry choices centred without a permanent rules panel. */
+#homeView { min-height: calc(100dvh - 64px); margin: 0 auto; display: flex; flex-direction: column; justify-content: center; }
+#homeView .menu-heading { text-align: center; }
+#gameView { min-height: calc(100dvh - 64px); display: flex; flex-direction: column; justify-content: center; }
+#gameView .topbar, #gameView .hero .eyebrow, #gameView .hero p { display: none; }
+#gameView .hero, #gameView .layout, #gameView .footer { width: min(100%, 1040px); margin-left: auto; margin-right: auto; }
+#gameView .hero { margin-top: 0; margin-bottom: 14px; }
+#gameView .hero h1 { font-size: clamp(23px, 2.4vw, 32px); }
+#gameView .layout { grid-template-columns: minmax(0, 1fr) 310px; gap: 14px; }
+#gameView .right { display: block; grid-row: auto; }
+#gameView .board { max-width: 520px; }
+.mobile-menu { display: none; }
+.move-options[hidden] { display: none; }
+.move-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 17px; }
+.move-options button { min-height: 46px; padding: 7px 3px; border: 1px solid var(--green); border-radius: 9px; background: #3d4c2e; color: #e9f4d9; font: inherit; font-size: 12px; font-weight: 800; touch-action: manipulation; }
+.move-options button:hover:not(:disabled) { background: #516a3a; }
+.move-options button:disabled { opacity: .55; }
+summary:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #f2c869; outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  #gameView .layout { grid-template-columns: 1fr; }
+  #gameView .board { max-width: min(100%, 480px); }
+}
+
+@media (max-width: 640px) {
+  .mobile-top { position: relative; min-height: 56px; }
+  .mobile-menu { display: block; margin-left: auto; }
+  .mobile-menu summary { display: grid; place-items: center; min-width: 72px; min-height: 44px; padding: 8px 12px; border: 1px solid #615d55; border-radius: 9px; color: var(--text); font-size: 13px; font-weight: 800; cursor: pointer; list-style: none; }
+  .mobile-menu summary::-webkit-details-marker { display: none; }
+  .mobile-menu nav { position: absolute; top: calc(100% - 3px); right: 12px; z-index: 10; min-width: 170px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); }
+  .mobile-menu button { width: 100%; min-height: 44px; padding: 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 14px; }
+  .mobile-menu button:hover { background: #3d4c2e; }
+  #homeView { min-height: calc(100dvh - 102px); }
+  #homeView .menu-heading { margin-bottom: 14px; }
+  #homeView .menu-heading h1 { font-size: 29px; }
+  #homeView .mode-row { display: grid; grid-template-columns: 48px minmax(0, 1fr); min-height: 0; gap: 10px 12px; }
+  #homeView .mode-row > div { min-width: 0; }
+  #homeView .mode-row h2 { margin-top: 0; font-size: 19px; }
+  #homeView .mode-row p { font-size: 12px; }
+  #homeView .mode-row .menu-field, #homeView .mode-row .menu-button { grid-column: 1 / -1; width: 100%; }
+  #homeView .mode-row .menu-field { margin-top: 2px; }
+  #gameView { min-height: calc(100dvh - 102px); }
+  #gameView .hero { margin: 0 auto 8px; text-align: center; }
+  #gameView .hero h1 { margin: 0; font-size: 22px; }
+  #gameView .layout { display: grid; gap: 8px; }
+  #gameView .board-shell { padding: 6px; }
+  #gameView .board { width: min(100%, 36dvh); max-width: none; border-width: 4px; }
+  #gameView .panel-head { padding: 7px 12px; }
+  #gameView .panel-head h2 { font-size: 12px; }
+  #gameView .panel-head span, #gameView .board-caption > span { display: none; }
+  #gameView .board-caption { justify-content: center; padding: 5px 10px; }
+  #gameView .control-top { padding: 8px 11px; }
+  #gameView .control-top h2 { margin: 0; font-size: 13px; }
+  #gameView .control-top p { display: none; }
+  #gameView .controls { padding: 8px; }
+  #gameView .players { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  #gameView .player { min-height: 38px; gap: 6px; padding: 5px 6px; }
+  #gameView .player-dot { width: 20px; height: 20px; }
+  #gameView .player strong { font-size: 11px; }
+  #gameView .player small { font-size: 9px; }
+  #gameView .player .count { font-size: 10px; }
+  #gameView .dice-area { margin-top: 8px; padding: 7px; gap: 10px; }
+  #gameView .dice-face { width: 44px; height: 44px; flex-basis: 44px; }
+  #gameView .dice-copy strong { font-size: 13px; }
+  #gameView .roll { min-height: 46px; margin-top: 8px; padding: 8px; touch-action: manipulation; }
+  #gameView .move-options { margin-top: 8px; }
+  #gameView .help { min-height: 0; margin: 6px 0 0; font-size: 10px; }
+  #gameView .piece.selectable { width: max(28px, 7.5%); height: max(28px, 7.5%); touch-action: manipulation; }
+  #gameView .footer { justify-content: center; margin-top: 5px; }
+  #gameView .footer > span { display: none; }
+  #gameView .footer button { min-height: 44px; padding: 8px 14px; }
+}
+
+@media (max-width: 640px) and (max-height: 720px) {
+  #gameView .hero { display: none; }
+  #gameView .board { width: min(100%, 33dvh); }
+  #gameView .players { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  #gameView .player { min-width: 0; min-height: 38px; gap: 3px; padding: 4px; }
+  #gameView .player-dot { flex: 0 0 12px; width: 12px; height: 12px; }
+  #gameView .player strong { overflow: hidden; max-width: 58px; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+  #gameView .player small, #gameView .player .count, #gameView .help { display: none; }
+  #gameView .dice-area { margin-top: 6px; padding: 5px; }
+  #gameView .footer { margin-top: 0; }
+}
