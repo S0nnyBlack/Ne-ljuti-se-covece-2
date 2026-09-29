@@ -1,4 +1,4 @@
-// Pravila preuzeta iz interaktivnog koncepta; varijante su opisane u README.
+// Server je jedini autoritet za kockicu, redosled i dozvoljene poteze.
 export const STARTS = [0, 13, 26, 39];
 export const COLORS = ["red", "blue", "yellow", "green"];
 export const FINISH = 57;
@@ -13,6 +13,7 @@ export function newGame(seats = 4) {
     version: 1, seats, players: Array(seats).fill(null),
     pieces: Array.from({ length: seats }, () => [-1, -1, -1, -1]),
     phase: "lobby", current: 0, roll: null, turn: 1, winner: null, revision: 0,
+    starterCandidates: [], starterRolls: Array(seats).fill(null), openingAttempts: 0,
     lastAction: null
   };
 }
@@ -37,7 +38,11 @@ export function start(game, seat) {
   game.seats = joined;
   game.players.length = joined;
   game.pieces.length = joined;
-  game.phase = "await-roll";
+  game.phase = "choose-starter";
+  game.current = 0;
+  game.starterCandidates = Array.from({ length: joined }, (_, index) => index);
+  game.starterRolls = Array(joined).fill(null);
+  game.openingAttempts = 0;
   game.revision++;
   game.lastAction = { type: "start", seat, players: joined };
   return game.lastAction;
@@ -60,32 +65,74 @@ export function legalMoves(game) {
   if (game.phase !== "await-move") return [];
   return game.pieces[game.current].flatMap((pos, piece) => {
     if (pos === FINISH) return [];
-    if (pos === -1) return game.roll === 6 ? [piece] : [];
-    return pos + game.roll <= FINISH ? [piece] : [];
+    if (pos === -1 && game.roll !== 6) return [];
+    const destination = pos === -1 ? 0 : pos + game.roll;
+    if (destination > FINISH) return [];
+    // Each colour has its own finishing lane. The shared ring uses absolute squares.
+    // FINISH is exempt: all four figures must eventually reach that one goal.
+    const occupied = game.pieces[game.current].some((other, index) => index !== piece && other >= 0 &&
+      destination !== FINISH && other !== FINISH &&
+      (destination < 52 && other < 52
+        ? (STARTS[game.current] + destination) % 52 === (STARTS[game.current] + other) % 52
+        : destination === other));
+    return occupied ? [] : [piece];
   });
 }
 
 function advance(game) {
   game.current = (game.current + 1) % game.seats;
   game.turn++;
+  game.openingAttempts = 0;
 }
 
 export function roll(game, seat, die) {
-  if (game.phase !== "await-roll") throw new GameError("Bacanje sada nije dozvoljeno.");
+  if (game.phase !== "await-roll" && game.phase !== "choose-starter") throw new GameError("Bacanje sada nije dozvoljeno.");
   if (seat !== game.current) throw new GameError("Nije vaš potez.");
   if (!Number.isInteger(die) || die < 1 || die > 6) throw new GameError("Kockica mora biti 1–6.");
+  if (game.phase === "choose-starter") {
+    game.starterRolls[seat] = die;
+    const remaining = game.starterCandidates.filter(candidate => game.starterRolls[candidate] === null);
+    let winnerSeat = null;
+    let tiedSeats = [];
+    if (remaining.length) game.current = remaining[0];
+    else {
+      const highest = Math.max(...game.starterCandidates.map(candidate => game.starterRolls[candidate]));
+      tiedSeats = game.starterCandidates.filter(candidate => game.starterRolls[candidate] === highest);
+      if (tiedSeats.length === 1) {
+        winnerSeat = tiedSeats[0];
+        game.current = winnerSeat;
+        game.phase = "await-roll";
+        game.starterCandidates = [];
+      } else {
+        game.starterCandidates = tiedSeats;
+        game.starterRolls = Array(game.seats).fill(null);
+        game.current = tiedSeats[0];
+      }
+    }
+    game.revision++;
+    game.lastAction = { type: "starter-roll", seat, die, winnerSeat, tiedSeats };
+    return game.lastAction;
+  }
   game.roll = die;
   game.phase = "await-move";
   const moves = legalMoves(game);
   const passed = moves.length === 0;
   const extra = passed && die === 6;
+  let attemptsLeft = 0;
   if (passed) {
     game.roll = null;
     game.phase = "await-roll";
-    if (!extra) advance(game);
+    if (!extra) {
+      const allAtHome = game.pieces[seat].every(position => position === -1 || position === FINISH) &&
+        game.pieces[seat].some(position => position === -1);
+      if (allAtHome && (game.openingAttempts || 0) < 2) {
+        game.openingAttempts = (game.openingAttempts || 0) + 1;
+        attemptsLeft = 3 - game.openingAttempts;
+      } else advance(game);
+    }
   }
   game.revision++;
-  game.lastAction = { type: "roll", seat, die, passed, extra, legalMoves: moves };
+  game.lastAction = { type: "roll", seat, die, passed, extra, attemptsLeft, legalMoves: moves };
   return game.lastAction;
 }
 
@@ -97,18 +144,17 @@ export function move(game, seat, piece) {
   const old = game.pieces[seat][piece];
   const position = old === -1 ? 0 : old + die;
   game.pieces[seat][piece] = position;
+  game.openingAttempts = 0;
   const captured = [];
   if (position < 52) {
     const square = (STARTS[seat] + position) % 52;
-    if (!STARTS.includes(square)) {
-      for (let other = 0; other < game.seats; other++) {
-        if (other === seat) continue;
-        for (let index = 0; index < 4; index++) {
-          const otherPos = game.pieces[other][index];
-          if (otherPos >= 0 && otherPos < 52 && (STARTS[other] + otherPos) % 52 === square) {
-            game.pieces[other][index] = -1;
-            captured.push({ seat: other, piece: index });
-          }
+    for (let other = 0; other < game.seats; other++) {
+      if (other === seat) continue;
+      for (let index = 0; index < 4; index++) {
+        const otherPos = game.pieces[other][index];
+        if (otherPos >= 0 && otherPos < 52 && (STARTS[other] + otherPos) % 52 === square) {
+          game.pieces[other][index] = -1;
+          captured.push({ seat: other, piece: index });
         }
       }
     }
@@ -132,6 +178,8 @@ export function publicGame(game) {
     version: game.version, seats: game.seats, players: game.players,
     pieces: game.pieces, phase: game.phase, current: game.current,
     roll: game.roll, turn: game.turn, winner: game.winner,
+    starterCandidates: game.starterCandidates || [], starterRolls: game.starterRolls || [],
+    openingAttempts: game.openingAttempts || 0,
     revision: game.revision, legalMoves: legalMoves(game), lastAction: game.lastAction
   };
 }

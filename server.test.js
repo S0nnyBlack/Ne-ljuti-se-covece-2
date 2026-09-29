@@ -37,7 +37,8 @@ async function fixture(t, options = {}) {
 }
 
 test('five-character rooms, authenticated reads, hashes and persistence with original rules', async t => {
-  const f = await fixture(t);
+  const dice = [6, 1, 6];
+  const f = await fixture(t, { rng: () => dice.shift() });
   const host = await f.create(2);
   assert.match(host.id, /^[A-HJ-NP-Z2-9]{5}$/);
   assert.match(host.token, /^[a-f0-9]{64}$/);
@@ -48,11 +49,15 @@ test('five-character rooms, authenticated reads, hashes and persistence with ori
   assert.equal((await f.request(`/api/games/${host.id}?token=${host.token}`)).status, 401);
   assert.equal((await f.command(guest, 'start', 2)).status, 400);
   assert.equal((await f.command(host, 'start', 2)).status, 200);
-  const rolled = await f.command(host, 'roll', 3);
+  assert.equal((await f.get(host)).value.phase, 'choose-starter');
+  assert.equal((await f.command(host, 'roll', 3)).status, 200);
+  assert.equal((await f.command(guest, 'roll', 4)).status, 200);
+  assert.equal((await f.get(host)).value.current, 0);
+  const rolled = await f.command(host, 'roll', 5);
   assert.deepEqual(rolled.value.legalMoves, [0, 1, 2, 3]);
-  assert.equal((await f.command(host, 'move', 4, { piece: 5 })).status, 400);
-  assert.equal((await f.get(host)).value.revision, 4);
-  const moved = await f.command(host, 'move', 4, { piece: 0 });
+  assert.equal((await f.command(host, 'move', 6, { piece: 5 })).status, 400);
+  assert.equal((await f.get(host)).value.revision, 6);
+  const moved = await f.command(host, 'move', 6, { piece: 0 });
   assert.equal(moved.value.pieces[0][0], 0);
   const disk = readFileSync(path.join(f.dir, `${host.id}.json`), 'utf8');
   assert.equal(disk.includes(host.token), false);
@@ -60,6 +65,32 @@ test('five-character rooms, authenticated reads, hashes and persistence with ori
   assert.equal(JSON.stringify(moved.value).includes('tokenHash'), false);
   await f.restart();
   assert.deepEqual((await f.get(host)).value, moved.value);
+});
+
+test('opening tie-break and three attempts persist across restart', async t => {
+  const dice = [4, 4, 5, 1, 2, 3, 4];
+  const f = await fixture(t, { rng: () => dice.shift() });
+  const host = await f.create(2);
+  const guest = await f.join(host.id);
+  await f.command(host, 'start', 2);
+  await f.command(host, 'roll', 3);
+  const tied = await f.command(guest, 'roll', 4);
+  assert.deepEqual(tied.value.starterCandidates, [0, 1]);
+  assert.equal(tied.value.phase, 'choose-starter');
+  await f.restart();
+  await f.command(host, 'roll', 5);
+  const selected = await f.command(guest, 'roll', 6);
+  assert.equal(selected.value.phase, 'await-roll');
+  assert.equal(selected.value.current, 0);
+  const first = await f.command(host, 'roll', 7);
+  assert.equal(first.value.openingAttempts, 1);
+  assert.equal(first.value.current, 0);
+  await f.restart();
+  const second = await f.command(host, 'roll', 8);
+  assert.equal(second.value.openingAttempts, 2);
+  const third = await f.command(host, 'roll', 9);
+  assert.equal(third.value.current, 1);
+  assert.equal(third.value.openingAttempts, 0);
 });
 
 test('idempotent commands survive restart, reject reused IDs and concurrent stale moves', async t => {

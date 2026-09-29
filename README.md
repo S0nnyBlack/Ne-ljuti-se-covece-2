@@ -15,13 +15,16 @@ Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; 
 
 ## Pravila
 
-- Šestica izvodi figuru iz kućice i daje novo bacanje.
+- Svaki igrač baca jednom za početak; najviši broj počinje. Ako više igrača deli najviši rezultat, samo izjednačeni ponovo bacaju dok jedan ne pobedi.
+- Svaki igrač ima četiri figure. Šestica izvodi figuru iz kuće na startno polje i daje novo bacanje.
+- Dok su sve preostale figure igrača u kući, ima do tri pokušaja da dobije šesticu u svom krugu. Kada ima figuru na tabli, važi jedno bacanje po krugu (osim dodatnih bacanja).
 - Svaka boja ima 52 polja zajedničkog kruga, zatim 5 završnih polja. Za cilj je potreban tačan broj koraka.
-- Protivnik se vraća u kućicu kada figura stane na njega van četiri obojena početna polja. Izbacivanje daje dodatno bacanje.
-- Ako nema dozvoljenog poteza, red prelazi dalje; posle šestice isti igrač baca ponovo.
+- Figure se pomeraju u smeru kazaljke na satu. Ne možeš stati na polje koje već zauzima tvoja figura, uključujući sopstveni start i završnu stazu. Zajednički cilj je izuzetak jer sve četiri figure moraju da stignu u njega.
+- Protivnik se vraća u kuću kada figura stane na njegovo polje, uključujući obojena startna polja. Izbacivanje daje dodatno bacanje.
+- Ako nema dozvoljenog poteza, red prelazi dalje posle poslednjeg pokušaja; posle šestice isti igrač baca ponovo.
 - Pobeđuje prvi igrač koji dovede sve četiri figure u cilj.
 
-Ovo su pravila iz vizuelnog prototipa. Pre takmičarske upotrebe potvrditi varijante: dodatna zaštitna polja, više figura na jednom polju, tri uzastopne šestice i broj pokušaja kada su sve figure u kućici.
+Nema dodatnih zaštitnih polja ni kazne za tri uzastopne šestice. Soba ostaje za 2–4 igrača; domaćin može da pokrene partiju čim su prisutna najmanje dva igrača. Pravila su prikazana i u prozoru „Pravila igre” i na kartici pored table.
 
 ## Arhitektura
 
