@@ -22,6 +22,8 @@
 .mode-row > div { flex: 1; min-width: 0; }
 .mode-row p { color: var(--muted); margin: 0; line-height: 1.45; }
 .mode-row .menu-button { flex: 0 0 205px; }
+.solo-mode { margin-top: 14px; }
+.mode-row .menu-field { flex: 0 0 130px; margin: 0; }
 .mode-icon { display: grid; place-items: center; flex: 0 0 58px; width: 58px; height: 58px; border-radius: 13px; background: #3d4c2e; color: var(--green); font-size: 30px; font-weight: 900; }
 .rules-teaser { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 15px 20px; border-left: 3px solid var(--green); border-radius: 10px; background: #33402d; color: #d5eabf; font-size: 13px; }
 .rules-teaser .menu-button { border-color: #587047; background: #3d4c2e; }

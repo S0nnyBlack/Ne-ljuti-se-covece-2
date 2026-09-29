@@ -1,4 +1,6 @@
 import { readRoomCode } from './room-code.js';
+import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
+import { chooseBotMove, rollBotDie } from './solo-bots.js';
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -11,6 +13,7 @@ const $ = selector => document.querySelector(selector);
 const storageKey = 'coveceArenaSessionV2';
 let session = null;
 let state = null;
+let soloGame = null;
 let events = null;
 let busy = false;
 let entryView = 'home';
@@ -237,7 +240,7 @@ function receive(next) {
 
 function connect() {
   events?.close();
-  if (!session) return;
+  if (!session || session.solo) return;
   const current = session;
   const controller = new AbortController();
   let timer;
@@ -282,6 +285,15 @@ function connect() {
 
 async function command(action, payload = {}) {
   const current = session;
+  if (current?.solo) {
+    if (action === 'roll') rollGame(soloGame, current.seat, rollBotDie());
+    else if (action === 'move') moveGame(soloGame, current.seat, payload.piece);
+    else throw new Error('Ova komanda nije dostupna u solo igri.');
+    state = publicGame(soloGame);
+    render();
+    await advanceSoloBots();
+    return publicGame(soloGame);
+  }
   const input = { ...payload, requestId: crypto.randomUUID(), expectedRevision: state.revision };
   try {
     // A transport retry must reuse both the ID and revision; it cannot roll twice.
@@ -294,6 +306,37 @@ async function command(action, payload = {}) {
     if (error.code === 'STALE_REVISION' && session === current) receive(await api(`/api/games/${current.id}`, 'GET', undefined, current.token));
     throw error;
   }
+}
+
+async function advanceSoloBots() {
+  while (session?.solo && soloGame.phase !== 'finished' && soloGame.current !== session.seat) {
+    const seat = soloGame.current;
+    if (soloGame.phase === 'choose-starter' || soloGame.phase === 'await-roll') {
+      rollGame(soloGame, seat, rollBotDie());
+    } else if (soloGame.phase === 'await-move') {
+      const piece = chooseBotMove(soloGame, seat);
+      if (piece === null) throw new Error('Bot nije pronašao dozvoljen potez.');
+      moveGame(soloGame, seat, piece);
+    } else break;
+    state = publicGame(soloGame);
+    render();
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+}
+
+async function startSoloGame(botCount = Number($('#botCount').value), playerName = $('#playerName').value.trim() || 'Igrač') {
+  const playerId = crypto.randomUUID();
+  soloGame = newGame(botCount + 1);
+  joinGame(soloGame, playerId, playerName);
+  for (let index = 1; index <= botCount; index++) joinGame(soloGame, crypto.randomUUID(), `Bot ${index}`);
+  startGame(soloGame, 0);
+  session = { id: 'solo', seat: 0, playerId, solo: true };
+  state = publicGame(soloGame);
+  history.replaceState(null, '', '/');
+  entryView = 'game';
+  render();
+  await advanceSoloBots();
+  receive(publicGame(soloGame));
 }
 
 async function establish(result) {
@@ -327,6 +370,7 @@ $('#joinBtn').onclick = () => submit(async () => {
   establish(result);
 });
 $('#enterOnline').onclick = () => { entryView = 'setup'; render(); };
+$('#soloBtn').onclick = () => submit(startSoloGame);
 $('#backHome').onclick = () => { entryView = 'home'; render(); };
 $('#startBtn').onclick = () => submit(() => command('start'));
 $('#copyBtn').onclick = async () => {
@@ -344,9 +388,10 @@ $('#leaveBtn').onclick = () => {
   ]);
 };
 $('#resetBtn').onclick = () => {
-  modal('Nova partija?', 'Napraviće se nova soba. Ova partija ostaje dostupna preko stare veze.', [
+  modal('Nova partija?', session?.solo ? 'Pokrenuće se nova solo partija sa istim brojem botova.' : 'Napraviće se nova soba. Ova partija ostaje dostupna preko stare veze.', [
     { label: 'Odustani' },
     { label: 'Napravi', primary: true, run: () => submit(async () => {
+      if (session?.solo) return startSoloGame(state.seats - 1, state.players[session.seat].name);
       const result = await api('/api/games', 'POST', { name: state?.players[session?.seat]?.name || $('#playerName').value.trim() || 'Igrač', seats: state?.seats || Number($('#seatCount').value) });
       establish(result);
     }) }
