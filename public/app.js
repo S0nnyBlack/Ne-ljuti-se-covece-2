@@ -2,6 +2,7 @@ import { readRoomCode } from './room-code.js';
 import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
 import { keyboardGameAction } from './keyboard-shortcuts.js';
+import { movementPositions } from './piece-motion.js';
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -70,8 +71,7 @@ function buildBoard() {
   $('#board').replaceChildren(fragment);
 }
 
-function coordinate(seat, piece) {
-  const position = state?.pieces[seat]?.[piece] ?? -1;
+function coordinate(seat, piece, position = state?.pieces[seat]?.[piece] ?? -1) {
   if (position < 0) return homes[seat][piece];
   if (position < 52) return track[(starts[seat] + position) % 52];
   if (position < 57) return lanes[seat][position - 52];
@@ -83,28 +83,60 @@ function canMove(seat, piece) {
 }
 
 function renderPieces() {
-  $('#board').querySelectorAll('.piece').forEach(element => element.remove());
-  if (!state) return;
+  const board = $('#board');
+  const existing = new Map([...board.querySelectorAll('.piece')].map(element => [`${element.dataset.seat}:${element.dataset.piece}`, element]));
+  if (!state) {
+    existing.forEach(element => element.remove());
+    return;
+  }
   const occupied = new Map();
   for (let seat = 0; seat < state.seats; seat++) for (let piece = 0; piece < 4; piece++) {
     const [x, y] = coordinate(seat, piece);
     const key = `${x},${y}`;
     const overlap = occupied.get(key) || 0;
     occupied.set(key, overlap + 1);
-    const element = document.createElement('button');
-    element.className = `piece ${colors[seat]} ${canMove(seat, piece) ? 'selectable' : ''}`;
+    const id = `${seat}:${piece}`;
+    const element = existing.get(id) || document.createElement('button');
+    existing.delete(id);
+    if (!element.classList.contains('piece')) element.className = `piece ${colors[seat]}`;
+    element.classList.toggle('selectable', canMove(seat, piece));
     element.style.left = `${(x + .5) / 15 * 100}%`;
     element.style.top = `${(y + .5) / 15 * 100}%`;
-    if (overlap) {
-      element.style.marginLeft = `${(overlap % 2 ? 1 : -1) * overlap * 4}px`;
-      element.style.marginTop = `${overlap * 2}px`;
-    }
+    element.style.marginLeft = overlap ? `${(overlap % 2 ? 1 : -1) * overlap * 4}px` : '';
+    element.style.marginTop = overlap ? `${overlap * 2}px` : '';
     element.disabled = !canMove(seat, piece);
     element.dataset.seat = seat;
     element.dataset.piece = piece;
     element.setAttribute('aria-label', `${names[seat]} figura ${piece + 1}${element.disabled ? '' : ', dostupna za pomeranje'}`);
-    $('#board').append(element);
+    if (!element.isConnected) board.append(element);
   }
+  existing.forEach(element => element.remove());
+}
+
+function animatePieceMove(previous, next) {
+  if (!previous || next.revision !== previous.revision + 1 ||
+      next.lastAction?.type !== 'move' || matchMedia('(prefers-reduced-motion: reduce)').matches) return Promise.resolve();
+  const { seat, piece, captured } = next.lastAction;
+  const positions = movementPositions(previous.pieces[seat]?.[piece], next.pieces[seat]?.[piece]);
+  const element = $('#board').querySelector(`.piece[data-seat="${seat}"][data-piece="${piece}"]`);
+  if (!element || !element.animate || !positions.length) return Promise.resolve();
+  const frames = positions.map(position => {
+    const [x, y] = coordinate(seat, piece, position);
+    return { left: `${(x + .5) / 15 * 100}%`, top: `${(y + .5) / 15 * 100}%` };
+  });
+  element.classList.add('piece-moving');
+  const animation = element.animate(frames, { duration: (positions.length - 1) * 150, easing: 'linear' });
+  return animation.finished.catch(() => {}).then(() => {
+    element.classList.remove('piece-moving');
+    if (animation.playState !== 'finished') return;
+    element.classList.add('piece-arrived');
+    setTimeout(() => element.classList.remove('piece-arrived'), 550);
+    for (const hit of captured || []) {
+      const returned = $('#board').querySelector(`.piece[data-seat="${hit.seat}"][data-piece="${hit.piece}"]`);
+      returned?.classList.add('piece-returned');
+      setTimeout(() => returned?.classList.remove('piece-returned'), 550);
+    }
+  });
 }
 
 function renderPlayers() {
@@ -241,9 +273,11 @@ function receive(next) {
         localStorage.setItem(storageKey, JSON.stringify(session));
       }
     }
+    const previousState = state;
     const previous = state?.revision;
     state = next;
     render();
+    void animatePieceMove(previousState, next);
     if (previous !== undefined && next.revision > previous && next.lastAction?.type === 'roll' && next.lastAction.passed) {
       toast(next.lastAction.attemptsLeft ? `Palo je ${next.lastAction.die}. Još ${next.lastAction.attemptsLeft} pokušaja za šesticu.` :
         `Palo je ${next.lastAction.die}. Nema mogućeg poteza.`);
@@ -307,8 +341,10 @@ async function command(action, payload = {}) {
     if (action === 'roll') rollGame(soloGame, current.seat, rollBotDie());
     else if (action === 'move') moveGame(soloGame, current.seat, payload.piece);
     else throw new Error('Ova komanda nije dostupna u solo igri.');
+    const previousState = state;
     state = publicGame(soloGame);
     render();
+    await animatePieceMove(previousState, state);
     await advanceSoloBots();
     return publicGame(soloGame);
   }
@@ -336,9 +372,11 @@ async function advanceSoloBots() {
       if (piece === null) throw new Error('Bot nije pronašao dozvoljen potez.');
       moveGame(soloGame, seat, piece);
     } else break;
+    const previousState = state;
     state = publicGame(soloGame);
     render();
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await animatePieceMove(previousState, state);
+    if (state.lastAction?.type === 'roll') await new Promise(resolve => setTimeout(resolve, 180));
   }
 }
 
