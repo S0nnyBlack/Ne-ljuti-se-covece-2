@@ -2,6 +2,7 @@ import { readRoomCode } from './room-code.js';
 import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
 import { keyboardGameAction } from './keyboard-shortcuts.js';
+import { readSession, saveSession, forgetSession } from './session-store.js';
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -11,7 +12,6 @@ const lanes = [[[7,1],[7,2],[7,3],[7,4],[7,5]],[[13,7],[12,7],[11,7],[10,7],[9,7
 const homes = [[[2,2],[3,2],[2,3],[3,3]],[[11,2],[12,2],[11,3],[12,3]],[[11,11],[12,11],[11,12],[12,12]],[[2,11],[3,11],[2,12],[3,12]]];
 const pipMap = {1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,24],[72,24],[28,50],[72,50],[28,76],[72,76]]};
 const $ = selector => document.querySelector(selector);
-const storageKey = 'coveceArenaSessionV2';
 let session = null;
 let state = null;
 let soloGame = null;
@@ -232,13 +232,14 @@ function receive(next) {
     if (session?.playerId) {
       const seat = next.players.findIndex(player => player?.id === session.playerId);
       if (seat < 0) {
+        forgetSession(localStorage, session);
         events?.close(); session = null; state = null; entryView = 'setup';
-        localStorage.removeItem(storageKey); history.replaceState(null, '', '/'); render();
+        history.replaceState(null, '', '/'); render();
         return;
       }
       if (seat !== session.seat) {
         session.seat = seat;
-        localStorage.setItem(storageKey, JSON.stringify(session));
+        saveSession(localStorage, session);
       }
     }
     const previous = state?.revision;
@@ -270,8 +271,9 @@ function connect() {
       });
       if ([401, 404].includes(response.status)) {
         if (session === current) {
+          forgetSession(localStorage, current);
           events.close(); session = null; state = null; entryView = 'setup';
-          localStorage.removeItem(storageKey); render(); toast('Soba ili sesija više nije dostupna.');
+          render(); toast('Soba ili sesija više nije dostupna.');
         }
         return;
       }
@@ -361,7 +363,7 @@ async function establish(result) {
   events?.close();
   state = null;
   session = { id: result.id, token: result.token, seat: result.seat, playerId: result.state.players[result.seat].id };
-  localStorage.setItem(storageKey, JSON.stringify(session));
+  saveSession(localStorage, session);
   history.replaceState(null, '', `?room=${result.id}`);
   receive(result.state);
   connect();
@@ -400,8 +402,9 @@ $('#leaveBtn').onclick = () => {
     { label: 'Odustani' },
     { label: 'Napusti', primary: true, run: () => submit(async () => {
       await command('leave');
+      forgetSession(localStorage, session);
       events?.close(); session = null; state = null; entryView = 'setup';
-      localStorage.removeItem(storageKey); history.replaceState(null, '', '/');
+      history.replaceState(null, '', '/');
     }) }
   ]);
 };
@@ -448,10 +451,18 @@ document.addEventListener('keydown', event => {
 });
 
 buildBoard();
-$('#joinCode').value = readRoomCode(location.search, location.origin);
-if ($('#joinCode').value) entryView = 'setup';
-try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
-if (session && /^[A-HJ-NP-Z2-9]{5}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
-  api(`/api/games/${session.id}`, 'GET', undefined, session.token).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
-} else session = null;
+const invitedRoom = readRoomCode(location.search, location.origin);
+$('#joinCode').value = invitedRoom;
+if (invitedRoom) entryView = 'setup';
+try { session = readSession(localStorage, invitedRoom); } catch { session = null; }
+if (session) {
+  const restoring = session;
+  api(`/api/games/${restoring.id}`, 'GET', undefined, restoring.token).then(receive).then(connect).catch(error => {
+    if ([401, 404].includes(error.status)) forgetSession(localStorage, restoring);
+    if (session === restoring) {
+      session = null; state = null; render();
+      if (![401, 404].includes(error.status)) toast('Veza nije dostupna. Osveži stranicu i pokušaj ponovo.');
+    }
+  });
+}
 render();

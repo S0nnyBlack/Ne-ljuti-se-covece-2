@@ -201,7 +201,10 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   const other = await f.create();
   assert.equal((await f.request(`/api/games/${host.id}`, { token: other.token })).status, 401);
   assert.equal((await f.request(`/api/games/${host.id}/start`, { token: host.token, payload: {} })).status, 400);
-  const page = await (await fetch(f.url('/'))).text();
+  const pageResponse = await fetch(f.url('/'));
+  assert.equal(pageResponse.headers.get('x-frame-options'), 'DENY');
+  assert.equal(pageResponse.headers.get('content-security-policy'), "frame-ancestors 'none'");
+  const page = await pageResponse.text();
   assert.match(page, /Kod od 5 znakova/);
   const client = await (await fetch(f.url('/app.js'))).text();
   assert.match(client, /authorization: `Bearer/);
@@ -210,6 +213,7 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.equal((await fetch(f.url('/game.js'))).status, 200);
   assert.equal((await fetch(f.url('/solo-bots.js'))).status, 200);
   assert.equal((await fetch(f.url('/keyboard-shortcuts.js'))).status, 200);
+  assert.equal((await fetch(f.url('/session-store.js'))).status, 200);
   assert.match(page, /Solo igra sa botovima/);
   assert.match(page, /<details class="mobile-menu"><summary>Meni<\/summary>/);
   assert.match(page, /id="mobileRules">Kako se igra<\/button>/);

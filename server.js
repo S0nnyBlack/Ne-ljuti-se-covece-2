@@ -60,10 +60,12 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
   const server = http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'none'");
     try {
       const url = new URL(req.url, 'http://localhost');
       const parts = url.pathname.split('/').filter(Boolean);
-      if (req.method === 'GET' && ['/', '/index.html', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/game.js', '/menu.css'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/', '/index.html', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/session-store.js', '/game.js', '/menu.css'].includes(url.pathname)) {
         const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
         const target = url.pathname === '/game.js' ? path.join(root, 'game.js') : path.join(root, 'public', file);
         const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';

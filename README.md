@@ -11,7 +11,7 @@ npm test
 npm start
 ```
 
-Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Početni ekran vodi na online sto sa odvojenim karticama za kreiranje i pridruživanje. Domaćin u čekaonici deli pozivni link i pokreće partiju kada se pridruže najmanje dva igrača. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. „Nova partija” pravi novu sobu.
+Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Početni ekran vodi na online sto sa odvojenim karticama za kreiranje i pridruživanje. Domaćin u čekaonici deli pozivni link i pokreće partiju kada se pridruže najmanje dva igrača. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. Pozivni link bira svoju sobu i kada pregledač pamti drugu partiju; prethodna sesija ostaje dostupna preko svog linka dok soba ne istekne. „Nova partija” pravi novu sobu.
 
 ## Pravila
 
@@ -24,7 +24,7 @@ Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; 
 - Ako nema dozvoljenog poteza, red prelazi dalje posle poslednjeg pokušaja; posle šestice isti igrač baca ponovo.
 - Pobeđuje prvi igrač koji dovede sve četiri figure u cilj.
 
-Nema dodatnih zaštitnih polja ni kazne za tri uzastopne šestice. Soba ostaje za 2–4 igrača; domaćin može da pokrene partiju čim su prisutna najmanje dva igrača. Pravila su prikazana i u prozoru „Pravila igre” i na kartici pored table.
+Nema dodatnih zaštitnih polja ni kazne za tri uzastopne šestice. Soba ostaje za 2–4 igrača; domaćin može da pokrene partiju čim su prisutna najmanje dva igrača. Pravila su prikazana u prozoru „Kako se igra”, koji je na telefonu u meniju.
 
 ## Arhitektura
 
