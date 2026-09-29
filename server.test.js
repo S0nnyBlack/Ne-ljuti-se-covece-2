@@ -207,6 +207,9 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.match(client, /authorization: `Bearer/);
   assert.match(client, /crypto.randomUUID/);
   assert.doesNotMatch(client, /new EventSource/);
+  assert.equal((await fetch(f.url('/game.js'))).status, 200);
+  assert.equal((await fetch(f.url('/solo-bots.js'))).status, 200);
+  assert.match(page, /Solo igra sa botovima/);
 });
 
 test('Render deployment uses its public URL unless a custom URL is configured', async t => {
