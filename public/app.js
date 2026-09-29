@@ -3,6 +3,8 @@ import { newGame, join as joinGame, start as startGame, roll as rollGame, move a
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
 import { keyboardGameAction } from './keyboard-shortcuts.js';
 import { movementPositions } from './piece-motion.js';
+import { restoreSoloSnapshot } from './solo-storage.js';
+import { describeAction } from './game-feed.js';
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -13,6 +15,7 @@ const homes = [[[2,2],[3,2],[2,3],[3,3]],[[11,2],[12,2],[11,3],[12,3]],[[11,11],
 const pipMap = {1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,24],[72,24],[28,50],[72,50],[28,76],[72,76]]};
 const $ = selector => document.querySelector(selector);
 const storageKey = 'coveceArenaSessionV2';
+const soloStorageKey = 'coveceArenaSoloV1';
 let session = null;
 let state = null;
 let soloGame = null;
@@ -20,6 +23,8 @@ let events = null;
 let busy = false;
 let entryView = 'home';
 let toastTimer;
+let connectionState = 'connecting';
+let actionHistory = [];
 
 function toast(message) {
   const element = $('#toast');
@@ -98,7 +103,10 @@ function renderPieces() {
     const id = `${seat}:${piece}`;
     const element = existing.get(id) || document.createElement('button');
     existing.delete(id);
-    if (!element.classList.contains('piece')) element.className = `piece ${colors[seat]}`;
+    if (!element.classList.contains('piece')) {
+      element.className = `piece ${colors[seat]}`;
+      element.textContent = String(piece + 1);
+    }
     element.classList.toggle('selectable', canMove(seat, piece));
     element.style.left = `${(x + .5) / 15 * 100}%`;
     element.style.top = `${(y + .5) / 15 * 100}%`;
@@ -209,15 +217,46 @@ function renderDice() {
   }
   $('#helpText').textContent = waiting ? 'Podeli pozivnicu drugim igračima.' : choosingStarter ?
     'Svi bacaju jednom; najviši broj počinje. Izjednačeni ponovo bacaju.' : finished ? 'Za novu partiju napravi novu sobu.' :
-    state?.phase === 'await-move' ? 'Izaberi figuru dugmetom ili dodirni označenu figuru na tabli.' :
+    state?.phase === 'await-move' ? 'Broj na figuri odgovara dugmetu ispod kockice. Dodirni označenu figuru ili dugme.' :
     state?.openingAttempts ? `Još ${3 - state.openingAttempts} pokušaja za šesticu.` : 'Šestica izvodi figuru iz kućice.';
+}
+
+function renderConnection() {
+  const status = session?.solo ? 'Solo igra' : connectionState === 'connected' ? 'Povezano' :
+    connectionState === 'reconnecting' ? 'Veza se obnavlja…' : 'Povezivanje…';
+  for (const id of ['lobbyConnection', 'gameConnection']) {
+    const element = $(`#${id}`);
+    if (element.textContent !== status) element.textContent = status;
+    element.dataset.state = session?.solo ? 'solo' : connectionState;
+  }
+}
+
+function recordAction(next) {
+  const description = describeAction(next);
+  if (description) actionHistory = [description, ...actionHistory].slice(0, 4);
+}
+
+function renderActionHistory() {
+  const list = $('#actionHistory');
+  list.replaceChildren();
+  for (const description of actionHistory.length ? actionHistory : ['Partija još nije počela.']) {
+    const item = document.createElement('li');
+    item.textContent = description;
+    list.append(item);
+  }
+}
+
+function saveSoloGame() {
+  if (!session?.solo || !soloGame) return;
+  try { localStorage.setItem(soloStorageKey, JSON.stringify({ version: 1, playerId: session.playerId, game: soloGame })); }
+  catch { toast('Solo partija nije sačuvana u ovom pregledaču.'); }
 }
 
 function render() {
   const view = session ? (!state || state.phase === 'lobby' ? 'lobby' : 'game') : entryView;
   for (const name of ['home', 'setup', 'lobby', 'game']) $(`#${name}View`).hidden = name !== view;
   if (view === 'lobby') renderLobby();
-  renderPlayers(); renderDice(); renderPieces();
+  renderPlayers(); renderDice(); renderPieces(); renderConnection(); renderActionHistory();
 }
 
 function renderLobby() {
@@ -275,6 +314,7 @@ function receive(next) {
     }
     const previousState = state;
     const previous = state?.revision;
+    if (previous === undefined || next.revision > previous) recordAction(next);
     state = next;
     render();
     void animatePieceMove(previousState, next);
@@ -293,6 +333,8 @@ function receive(next) {
 function connect() {
   events?.close();
   if (!session || session.solo) return;
+  connectionState = 'connecting';
+  renderConnection();
   const current = session;
   const controller = new AbortController();
   let timer;
@@ -310,6 +352,8 @@ function connect() {
         return;
       }
       if (!response.ok) throw new Error('Veza nije dostupna.');
+      connectionState = 'connected';
+      renderConnection();
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
@@ -328,9 +372,16 @@ function connect() {
         }
       } finally { await reader.cancel(); reader.releaseLock(); }
     } catch (error) {
-      if (!controller.signal.aborted && state?.phase === 'lobby') $('#lobbyWait').textContent = 'Veza se obnavlja…';
+      if (!controller.signal.aborted) {
+        connectionState = 'reconnecting';
+        renderConnection();
+      }
     }
-    if (!controller.signal.aborted && session === current) timer = setTimeout(stream, 3000);
+    if (!controller.signal.aborted && session === current) {
+      connectionState = 'reconnecting';
+      renderConnection();
+      timer = setTimeout(stream, 3000);
+    }
   }
   stream();
 }
@@ -338,11 +389,13 @@ function connect() {
 async function command(action, payload = {}) {
   const current = session;
   if (current?.solo) {
+    const previousState = structuredClone(state);
     if (action === 'roll') rollGame(soloGame, current.seat, rollBotDie());
     else if (action === 'move') moveGame(soloGame, current.seat, payload.piece);
     else throw new Error('Ova komanda nije dostupna u solo igri.');
-    const previousState = state;
     state = publicGame(soloGame);
+    recordAction(state);
+    saveSoloGame();
     render();
     await animatePieceMove(previousState, state);
     await advanceSoloBots();
@@ -364,6 +417,7 @@ async function command(action, payload = {}) {
 
 async function advanceSoloBots() {
   while (session?.solo && soloGame.phase !== 'finished' && soloGame.current !== session.seat) {
+    const previousState = structuredClone(state);
     const seat = soloGame.current;
     if (soloGame.phase === 'choose-starter' || soloGame.phase === 'await-roll') {
       rollGame(soloGame, seat, rollBotDie());
@@ -372,8 +426,9 @@ async function advanceSoloBots() {
       if (piece === null) throw new Error('Bot nije pronašao dozvoljen potez.');
       moveGame(soloGame, seat, piece);
     } else break;
-    const previousState = state;
     state = publicGame(soloGame);
+    recordAction(state);
+    saveSoloGame();
     render();
     await animatePieceMove(previousState, state);
     if (state.lastAction?.type === 'roll') await new Promise(resolve => setTimeout(resolve, 180));
@@ -387,7 +442,10 @@ async function startSoloGame(botCount = Number($('#botCount').value), playerName
   for (let index = 1; index <= botCount; index++) joinGame(soloGame, crypto.randomUUID(), `Bot ${index}`);
   startGame(soloGame, 0);
   session = { id: 'solo', seat: 0, playerId, solo: true };
+  localStorage.removeItem(storageKey);
+  actionHistory = [];
   state = publicGame(soloGame);
+  saveSoloGame();
   history.replaceState(null, '', '/');
   entryView = 'game';
   render();
@@ -398,6 +456,10 @@ async function startSoloGame(botCount = Number($('#botCount').value), playerName
 async function establish(result) {
   events?.close();
   state = null;
+  soloGame = null;
+  actionHistory = [];
+  connectionState = 'connecting';
+  localStorage.removeItem(soloStorageKey);
   session = { id: result.id, token: result.token, seat: result.seat, playerId: result.state.players[result.seat].id };
   localStorage.setItem(storageKey, JSON.stringify(session));
   history.replaceState(null, '', `?room=${result.id}`);
@@ -488,8 +550,20 @@ document.addEventListener('keydown', event => {
 buildBoard();
 $('#joinCode').value = readRoomCode(location.search, location.origin);
 if ($('#joinCode').value) entryView = 'setup';
-try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
-if (session && /^[A-HJ-NP-Z2-9]{5}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
-  api(`/api/games/${session.id}`, 'GET', undefined, session.token).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
-} else session = null;
-render();
+const savedSolo = restoreSoloSnapshot(localStorage.getItem(soloStorageKey));
+if (savedSolo) {
+  soloGame = savedSolo.game;
+  session = { id: 'solo', seat: 0, playerId: savedSolo.playerId, solo: true };
+  state = publicGame(soloGame);
+  entryView = 'game';
+  recordAction(state);
+  render();
+  void advanceSoloBots().catch(error => toast(error.message || 'Solo partija nije nastavljena.'));
+} else {
+  if (localStorage.getItem(soloStorageKey)) localStorage.removeItem(soloStorageKey);
+  try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
+  if (session && /^[A-HJ-NP-Z2-9]{5}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
+    api(`/api/games/${session.id}`, 'GET', undefined, session.token).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
+  } else session = null;
+  render();
+}
