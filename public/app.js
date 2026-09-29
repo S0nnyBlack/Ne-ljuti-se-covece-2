@@ -1,6 +1,7 @@
 import { readRoomCode } from './room-code.js';
 import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
+import { keyboardGameAction } from './keyboard-shortcuts.js';
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -169,6 +170,7 @@ function renderDice() {
     const button = document.createElement('button');
     button.textContent = `Figura ${piece + 1}`;
     button.setAttribute('aria-label', `Pomeri figuru ${piece + 1}`);
+    button.setAttribute('aria-keyshortcuts', String(piece + 1));
     button.disabled = busy;
     button.onclick = () => submit(() => command('move', { piece }));
     options.append(button);
@@ -426,7 +428,24 @@ function showRules(event) {
 $('#rulesLink').onclick = showRules;
 $('#mobileRules').onclick = showRules;
 $('#modalBg').onclick = event => { if (event.target.id === 'modalBg') $('#modalBg').classList.remove('show'); };
-document.addEventListener('keydown', event => { if (event.key === 'Escape') $('#modalBg').classList.remove('show'); });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') { $('#modalBg').classList.remove('show'); return; }
+  const target = event.target instanceof Element ? event.target : null;
+  const action = keyboardGameAction(event, {
+    desktop: matchMedia('(min-width: 641px)').matches,
+    visible: !$('#gameView').hidden,
+    modalOpen: $('#modalBg').classList.contains('show'),
+    busy,
+    ownTurn: !!session && !!state && state.current === session.seat,
+    phase: state?.phase,
+    legalMoves: state?.legalMoves || [],
+    focusIsEditable: !!target?.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]'),
+    focusIsActivatable: !!target?.closest('button, a, summary, [role="button"]')
+  });
+  if (!action) return;
+  event.preventDefault();
+  submit(() => command(action.type, action.type === 'move' ? { piece: action.piece } : {}));
+});
 
 buildBoard();
 $('#joinCode').value = readRoomCode(location.search, location.origin);
