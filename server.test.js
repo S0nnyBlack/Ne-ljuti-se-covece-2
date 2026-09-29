@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, readFileSync, readdirSync, writeFileSync } from 'n
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { createApp } from './server.js';
+import { createApp, resolvePublicUrl } from './server.js';
 import { RoomStore, RateLimiter } from './room-store.js';
 
 async function fixture(t, options = {}) {
@@ -176,6 +176,20 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.match(client, /authorization: `Bearer/);
   assert.match(client, /crypto.randomUUID/);
   assert.doesNotMatch(client, /new EventSource/);
+});
+
+test('Render deployment uses its public URL unless a custom URL is configured', async t => {
+  assert.equal(resolvePublicUrl({ RENDER_EXTERNAL_URL: 'https://game.onrender.com' }), 'https://game.onrender.com');
+  assert.equal(resolvePublicUrl({ PUBLIC_URL: 'https://play.example', RENDER_EXTERNAL_URL: 'https://game.onrender.com' }), 'https://play.example');
+  const f = await fixture(t, { publicUrl: resolvePublicUrl({ RENDER_EXTERNAL_URL: 'https://game.onrender.com' }) });
+  const created = await f.request('/api/games', {
+    payload: { name: 'Ana' }, headers: { 'content-type': 'application/json', origin: 'https://game.onrender.com' }
+  });
+  assert.equal(created.status, 201);
+  const foreign = await f.request(`/api/games/${created.value.id}`, {
+    token: created.value.token, headers: { origin: 'https://other.example' }
+  });
+  assert.equal(foreign.status, 403);
 });
 
 test('limiter prunes expired keys and absolute/finished room lifetime is enforced', () => {
