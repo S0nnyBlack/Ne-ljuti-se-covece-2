@@ -1,3 +1,5 @@
+import { readRoomCode } from './room-code.js';
+
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
 const starts = [0, 13, 26, 39];
@@ -6,7 +8,7 @@ const lanes = [[[7,1],[7,2],[7,3],[7,4],[7,5]],[[13,7],[12,7],[11,7],[10,7],[9,7
 const homes = [[[2,2],[3,2],[2,3],[3,3]],[[11,2],[12,2],[11,3],[12,3]],[[11,11],[12,11],[11,12],[12,12]],[[2,11],[3,11],[2,12],[3,12]]];
 const pipMap = {1:[[50,50]],2:[[28,28],[72,72]],3:[[28,28],[50,50],[72,72]],4:[[28,28],[72,28],[28,72],[72,72]],5:[[28,28],[72,28],[50,50],[28,72],[72,72]],6:[[28,24],[72,24],[28,50],[72,50],[28,76],[72,76]]};
 const $ = selector => document.querySelector(selector);
-const storageKey = 'coveceArenaSessionV1';
+const storageKey = 'coveceArenaSessionV2';
 let session = null;
 let state = null;
 let events = null;
@@ -184,11 +186,11 @@ function renderLobby() {
 async function api(url, method = 'GET', payload, token) {
   const response = await fetch(url, {
     method,
-    headers: payload === undefined ? {} : { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    headers: { ...(payload === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: `Bearer ${token}` } : {}) },
     body: payload === undefined ? undefined : JSON.stringify(payload)
   });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'Zahtev nije uspeo.');
+  if (!response.ok) throw Object.assign(new Error(result.error || 'Zahtev nije uspeo.'), { status: response.status, code: result.code });
   return result;
 }
 
@@ -217,9 +219,62 @@ function receive(next) {
 function connect() {
   events?.close();
   if (!session) return;
-  events = new EventSource(`/api/games/${session.id}/events`);
-  events.addEventListener('state', event => receive(JSON.parse(event.data)));
-  events.onerror = () => { if (state?.phase === 'lobby') $('#lobbyWait').textContent = 'Veza se obnavlja…'; };
+  const current = session;
+  const controller = new AbortController();
+  let timer;
+  events = { close() { controller.abort(); clearTimeout(timer); } };
+  async function stream() {
+    try {
+      const response = await fetch(`/api/games/${current.id}/events`, {
+        headers: { authorization: `Bearer ${current.token}` }, signal: controller.signal
+      });
+      if ([401, 404].includes(response.status)) {
+        if (session === current) {
+          events.close(); session = null; state = null; entryView = 'setup';
+          localStorage.removeItem(storageKey); render(); toast('Soba ili sesija više nije dostupna.');
+        }
+        return;
+      }
+      if (!response.ok) throw new Error('Veza nije dostupna.');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      try {
+        while (!controller.signal.aborted) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let boundary;
+          while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+            const event = buffer.slice(0, boundary);
+            buffer = buffer.slice(boundary + 2);
+            const data = event.split('\n').find(line => line.startsWith('data: '));
+            if (data && session === current) receive(JSON.parse(data.slice(6)));
+          }
+        }
+      } finally { await reader.cancel(); reader.releaseLock(); }
+    } catch (error) {
+      if (!controller.signal.aborted && state?.phase === 'lobby') $('#lobbyWait').textContent = 'Veza se obnavlja…';
+    }
+    if (!controller.signal.aborted && session === current) timer = setTimeout(stream, 3000);
+  }
+  stream();
+}
+
+async function command(action, payload = {}) {
+  const current = session;
+  const input = { ...payload, requestId: crypto.randomUUID(), expectedRevision: state.revision };
+  try {
+    // A transport retry must reuse both the ID and revision; it cannot roll twice.
+    try { return await api(`/api/games/${current.id}/${action}`, 'POST', input, current.token); }
+    catch (error) {
+      if (error.status) throw error;
+      return await api(`/api/games/${current.id}/${action}`, 'POST', input, current.token);
+    }
+  } catch (error) {
+    if (error.code === 'STALE_REVISION' && session === current) receive(await api(`/api/games/${current.id}`, 'GET', undefined, current.token));
+    throw error;
+  }
 }
 
 async function establish(result) {
@@ -247,14 +302,14 @@ $('#createBtn').onclick = () => submit(async () => {
   establish(result);
 });
 $('#joinBtn').onclick = () => submit(async () => {
-  const id = $('#joinCode').value.trim().toLowerCase().replace(/^.*room=/, '');
-  if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unesi pun kod sobe ili pozivni link.');
+  const id = readRoomCode($('#joinCode').value, location.origin);
+  if (!id) throw new Error('Unesi kod sobe od 5 znakova ili pozivni link.');
   const result = await api(`/api/games/${id}/join`, 'POST', { name: $('#joinName').value.trim() || 'Igrač' });
   establish(result);
 });
 $('#enterOnline').onclick = () => { entryView = 'setup'; render(); };
 $('#backHome').onclick = () => { entryView = 'home'; render(); };
-$('#startBtn').onclick = () => submit(() => api(`/api/games/${session.id}/start`, 'POST', {}, session.token));
+$('#startBtn').onclick = () => submit(() => command('start'));
 $('#copyBtn').onclick = async () => {
   try { await navigator.clipboard.writeText(`${location.origin}/?room=${session.id}`); toast('Pozivnica je kopirana.'); }
   catch { toast(`Kod sobe: ${session.id}`); }
@@ -263,8 +318,7 @@ $('#leaveBtn').onclick = () => {
   modal('Napusti sobu?', 'Tvoje mesto će biti oslobođeno. Ako si domaćin, sledeći igrač preuzima sobu.', [
     { label: 'Odustani' },
     { label: 'Napusti', primary: true, run: () => submit(async () => {
-      const leaving = session;
-      await api(`/api/games/${leaving.id}/leave`, 'POST', {}, leaving.token);
+      await command('leave');
       events?.close(); session = null; state = null; entryView = 'setup';
       localStorage.removeItem(storageKey); history.replaceState(null, '', '/');
     }) }
@@ -279,10 +333,10 @@ $('#resetBtn').onclick = () => {
     }) }
   ]);
 };
-$('#rollBtn').onclick = () => submit(() => api(`/api/games/${session.id}/roll`, 'POST', {}, session.token));
+$('#rollBtn').onclick = () => submit(() => command('roll'));
 $('#board').onclick = event => {
   const piece = event.target.closest('.piece');
-  if (piece && !piece.disabled) submit(() => api(`/api/games/${session.id}/move`, 'POST', { piece: Number(piece.dataset.piece) }, session.token));
+  if (piece && !piece.disabled) submit(() => command('move', { piece: Number(piece.dataset.piece) }));
 };
 function showRules(event) {
   event.preventDefault();
@@ -294,10 +348,10 @@ $('#modalBg').onclick = event => { if (event.target.id === 'modalBg') $('#modalB
 document.addEventListener('keydown', event => { if (event.key === 'Escape') $('#modalBg').classList.remove('show'); });
 
 buildBoard();
-$('#joinCode').value = new URLSearchParams(location.search).get('room') || '';
+$('#joinCode').value = readRoomCode(location.search, location.origin);
 if ($('#joinCode').value) entryView = 'setup';
 try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
-if (session && /^[a-f0-9]{32}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
-  api(`/api/games/${session.id}`).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
+if (session && /^[A-HJ-NP-Z2-9]{5}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
+  api(`/api/games/${session.id}`, 'GET', undefined, session.token).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
 } else session = null;
 render();
