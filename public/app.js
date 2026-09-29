@@ -115,7 +115,11 @@ function renderPlayers() {
     const title = document.createElement('strong');
     title.textContent = state?.players[seat]?.name || names[seat];
     const sub = document.createElement('small');
-    sub.textContent = seat >= (state?.seats || 4) ? 'Nije u partiji' : !state?.players[seat] ? 'Slobodno mesto' : state.phase === 'lobby' ? 'Spreman' : state.winner === seat ? 'Pobednik' : state.current === seat ? 'Na potezu' : 'Čeka red';
+    sub.textContent = seat >= (state?.seats || 4) ? 'Nije u partiji' : !state?.players[seat] ? 'Slobodno mesto' :
+      state.phase === 'lobby' ? 'Spreman' : state.phase === 'choose-starter' ?
+      state.starterRolls?.[seat] != null ? `Bacio ${state.starterRolls[seat]}` :
+      state.starterCandidates?.includes(seat) ? seat === state.current ? 'Baca za početak' : 'Čeka bacanje' : 'Čeka ishod' :
+      state.winner === seat ? 'Pobednik' : state.current === seat ? 'Na potezu' : 'Čeka red';
     info.append(title, sub);
     const count = document.createElement('span');
     count.className = 'count';
@@ -127,7 +131,7 @@ function renderPlayers() {
 
 function renderDice() {
   $('#modeSeats').textContent = `${state?.seats || 4} igrača`;
-  const die = state?.roll || (state?.lastAction?.type === 'roll' ? state.lastAction.die : state?.lastAction?.die) || 1;
+  const die = state?.roll || state?.lastAction?.die || 1;
   $('#diceFace').replaceChildren(...pipMap[die].map(([x, y]) => {
     const pip = document.createElement('i');
     pip.className = 'pip';
@@ -135,17 +139,25 @@ function renderDice() {
     pip.style.top = `${y}%`;
     return pip;
   }));
-  $('#turnNo').textContent = `Potez ${String(state?.turn || 1).padStart(2, '0')}`;
+  const choosingStarter = state?.phase === 'choose-starter';
+  $('#turnNo').textContent = choosingStarter ? 'Ko počinje?' : `Potez ${String(state?.turn || 1).padStart(2, '0')}`;
   const active = state?.players[state.current];
   const activeName = active?.name || names[state?.current || 0];
   const waiting = state?.phase === 'lobby';
   const finished = state?.phase === 'finished';
-  $('#diceTitle').textContent = state?.roll ? `Palo je ${state.roll}` : waiting ? 'Čekamo igrače' : finished ? 'Partija je završena' : 'Spreman?';
-  $('#diceSubtitle').textContent = waiting ? `${state.players.filter(Boolean).length}/${state.seats} igrača` : state?.phase === 'await-move' ? 'Izaberi označenu figuru.' : `${activeName} je na potezu.`;
-  $('#boardStatus').textContent = finished ? `${state.players[state.winner].name} je pobedio/la!` : waiting ? 'Čekamo igrače' : `${activeName} je na potezu`;
-  $('#rollBtn').disabled = busy || !session || !state || state.phase !== 'await-roll' || state.current !== session.seat;
-  $('#rollBtn').textContent = finished ? 'Partija završena' : state?.phase === 'await-move' ? 'Izaberi figuru' : waiting ? 'Čekamo igrače' : state?.current !== session?.seat ? 'Čekaj svoj red' : 'Baci kockicu';
-  $('#helpText').textContent = waiting ? 'Podeli pozivnicu drugim igračima.' : finished ? 'Za novu partiju napravi novu sobu.' : state?.phase === 'await-move' ? 'Klikni osvetljenu figuru na tabli.' : 'Šestica izvodi figuru iz kućice.';
+  $('#diceTitle').textContent = state?.roll ? `Palo je ${state.roll}` : waiting ? 'Čekamo igrače' :
+    choosingStarter ? 'Biramo prvog igrača' : finished ? 'Partija je završena' : 'Spreman?';
+  $('#diceSubtitle').textContent = waiting ? `${state.players.filter(Boolean).length}/${state.seats} igrača` :
+    choosingStarter ? `${activeName} baca za početak.` : state?.phase === 'await-move' ? 'Izaberi označenu figuru.' : `${activeName} je na potezu.`;
+  $('#boardStatus').textContent = finished ? `${state.players[state.winner].name} je pobedio/la!` : waiting ? 'Čekamo igrače' :
+    choosingStarter ? `${activeName} baca za početak` : `${activeName} je na potezu`;
+  $('#rollBtn').disabled = busy || !session || !state || !['await-roll', 'choose-starter'].includes(state.phase) || state.current !== session.seat;
+  $('#rollBtn').textContent = finished ? 'Partija završena' : state?.phase === 'await-move' ? 'Izaberi figuru' : waiting ? 'Čekamo igrače' :
+    state?.current !== session?.seat ? 'Čekaj svoj red' : choosingStarter ? 'Baci za početak' : 'Baci kockicu';
+  $('#helpText').textContent = waiting ? 'Podeli pozivnicu drugim igračima.' : choosingStarter ?
+    'Svi bacaju jednom; najviši broj počinje. Izjednačeni ponovo bacaju.' : finished ? 'Za novu partiju napravi novu sobu.' :
+    state?.phase === 'await-move' ? 'Klikni osvetljenu figuru na tabli.' :
+    state?.openingAttempts ? `Još ${3 - state.openingAttempts} pokušaja za šesticu.` : 'Šestica izvodi figuru iz kućice.';
 }
 
 function render() {
@@ -211,7 +223,14 @@ function receive(next) {
     const previous = state?.revision;
     state = next;
     render();
-    if (previous !== undefined && next.revision > previous && next.lastAction?.type === 'roll' && next.lastAction.passed) toast(`Palo je ${next.lastAction.die}. Nema mogućeg poteza.`);
+    if (previous !== undefined && next.revision > previous && next.lastAction?.type === 'roll' && next.lastAction.passed) {
+      toast(next.lastAction.attemptsLeft ? `Palo je ${next.lastAction.die}. Još ${next.lastAction.attemptsLeft} pokušaja za šesticu.` :
+        `Palo je ${next.lastAction.die}. Nema mogućeg poteza.`);
+    }
+    if (previous !== undefined && next.revision > previous && next.lastAction?.type === 'starter-roll') {
+      if (next.lastAction.winnerSeat != null) toast(`${next.players[next.lastAction.winnerSeat].name} počinje partiju.`);
+      else if (next.lastAction.tiedSeats?.length > 1) toast('Izjednačenje! Izjednačeni ponovo bacaju.');
+    }
     if (previous !== undefined && next.revision > previous && next.phase === 'finished') modal('Pobeda!', `${next.players[next.winner].name} je doveo/la sve četiri figure u cilj.`, [{ label: 'Zatvori' }]);
   }
 }
@@ -340,7 +359,7 @@ $('#board').onclick = event => {
 };
 function showRules(event) {
   event.preventDefault();
-  modal('Kako se igra', 'Igrači igraju naizmenično. Šestica izvodi figuru iz kućice i daje novo bacanje. Izaberi osvetljenu figuru. Ako staneš na protivničku figuru van obojenih početnih polja, vraćaš je u kućicu i ponovo bacaš. Za cilj je potreban tačan broj koraka. Pobeđuje igrač koji prvi uvede sve četiri figure.', [{ label: 'Razumem', primary: true }]);
+  modal('Kako se igra', 'Svaki igrač ima četiri figure. Svi bacaju za početak: najviši broj počinje, a izjednačeni ponovo bacaju. Šestica izvodi figuru iz kuće i daje novo bacanje. Kada su ti sve preostale figure u kući, imaš do tri pokušaja da dobiješ šesticu. Kreći se u smeru kazaljke na satu. Ne možeš stati na svoju figuru, osim u zajedničkom cilju. Na protivničku figuru možeš stati i na obojenom startu: vraćaš je u kuću i ponovo bacaš. Za cilj je potreban tačan broj koraka. Pobeđuje prvi sa sve četiri figure u cilju.', [{ label: 'Razumem', primary: true }]);
 }
 $('#rulesLink').onclick = showRules;
 $('#homeRules').onclick = showRules;
