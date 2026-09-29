@@ -209,6 +209,7 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.doesNotMatch(client, /new EventSource/);
   assert.equal((await fetch(f.url('/game.js'))).status, 200);
   assert.equal((await fetch(f.url('/solo-bots.js'))).status, 200);
+  assert.equal((await fetch(f.url('/keyboard-shortcuts.js'))).status, 200);
   assert.match(page, /Solo igra sa botovima/);
   assert.match(page, /<details class="mobile-menu"><summary>Meni<\/summary>/);
   assert.match(page, /id="mobileRules">Kako se igra<\/button>/);
