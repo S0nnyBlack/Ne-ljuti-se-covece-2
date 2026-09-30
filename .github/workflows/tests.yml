@@ -15,5 +15,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm test
       - run: node --check public/app.js
+      - run: node --check security.js
       - name: Check Arena browser modules
         run: for file in public/hub/shared/*.js public/arena-navigation.js; do node --check "$file"; done
+

@@ -310,3 +310,24 @@ test('Arena homepage, English entry, room redirects and public modules are avail
     assert.equal((await fetch(f.url(route))).status, 404);
   }
 });
+
+test('browser defenses block framing and foreign scripts while keeping authenticated room reads private', async t => {
+  const f = await fixture(t, { publicUrl: 'https://ne-ljuti-se-covece-2.onrender.com' });
+  const response = await fetch(f.url('/covece'));
+  const csp = response.headers.get('content-security-policy');
+  assert.match(csp, /script-src 'self'/);
+  assert.doesNotMatch(csp, /script-src[^;]*(unsafe-inline|unsafe-eval|https:)/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /base-uri 'none'/);
+  assert.equal(response.headers.get('x-frame-options'), 'DENY');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  const room = await f.create();
+  assert.equal((await f.request('/api/games/' + room.id)).status, 401);
+  assert.equal((await f.request('/api/games/' + room.id + '/events')).status, 401);
+  const foreign = await f.request('/api/games/' + room.id, { token: room.token, headers: { origin: 'https://evil.example' } });
+  assert.equal(foreign.status, 403);
+  const hidden = await f.request('/api/games/' + room.id + '/events', { token: room.token, headers: { 'sec-fetch-site': 'cross-site' } });
+  assert.equal(hidden.status, 403);
+  assert.equal((await f.get(room)).status, 200);
+});
