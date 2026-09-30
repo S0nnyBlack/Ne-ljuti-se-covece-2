@@ -7,6 +7,11 @@ import { GameError, newGame, join, leave, start, roll, move, publicGame } from '
 import { RoomStore, RateLimiter, RoomError, codePattern, hashToken, fail } from './room-store.js';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+const hubFiles = new Set([
+        '/hub/shared/arena.css', '/hub/shared/arena-ui.js', '/hub/shared/brand-die.js',
+        '/hub/shared/language.js', '/hub/shared/messages.js'
+      ]);
+
 const bearer = /^Bearer ([a-f0-9]{64})$/;
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 export const resolvePublicUrl = (env = process.env) => env.PUBLIC_URL || env.RENDER_EXTERNAL_URL;
@@ -63,8 +68,21 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
     try {
       const url = new URL(req.url, 'http://localhost');
       const parts = url.pathname.split('/').filter(Boolean);
-      if (req.method === 'GET' && ['/', '/index.html', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/piece-motion.js', '/solo-storage.js', '/game-feed.js', '/game.js', '/menu.css'].includes(url.pathname)) {
-        const file = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
+      if (req.method === 'GET' && url.pathname === '/' && url.searchParams.has('room')) {
+        res.writeHead(302, { location: '/covece' + url.search, 'cache-control': 'no-store' });
+        res.end();
+        return;
+      }
+      if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/en.html' || hubFiles.has(url.pathname))) {
+        const file = url.pathname === '/' ? 'hub/index.html' : url.pathname === '/en.html' ? 'hub/en.html' : url.pathname.slice(1);
+        const target = path.join(root, 'public', file);
+        const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';
+        res.writeHead(200, { 'content-type': contentType, 'content-length': statSync(target).size, 'cache-control': 'no-cache' });
+        createReadStream(target).pipe(res);
+        return;
+      }
+      if (req.method === 'GET' && ['/covece', '/covece/', '/index.html', '/arena-navigation.js', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/piece-motion.js', '/solo-storage.js', '/game-feed.js', '/game.js', '/menu.css'].includes(url.pathname)) {
+        const file = ['/covece', '/covece/'].includes(url.pathname) ? 'index.html' : url.pathname.slice(1);
         const target = url.pathname === '/game.js' ? path.join(root, 'game.js') : path.join(root, 'public', file);
         const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';
         res.writeHead(200, { 'content-type': contentType, 'content-length': statSync(target).size, 'cache-control': 'no-cache' });

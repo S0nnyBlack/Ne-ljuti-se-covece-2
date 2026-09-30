@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#262522">
+<meta name="description" content="Arena Games — Yamb and Ludo. Choose a game and play with friends.">
+<title>Arena Games — Choose a game</title>
+<link rel="stylesheet" href="/hub/shared/arena.css">
+</head>
+<body>
+<a class="skip" href="#games" data-i18n="skip">Skip to games</a>
+<div class="shell">
+<aside class="sidebar">
+ <div class="brand"><button class="brand-mark" id="brandDie" type="button" aria-label="Die shows 5. Click to roll again." title="Roll the die"><span class="brand-face" aria-hidden="true"><i class="brand-pip" style="grid-area:1/1"></i><i class="brand-pip" style="grid-area:1/3"></i><i class="brand-pip" style="grid-area:2/2"></i><i class="brand-pip" style="grid-area:3/1"></i><i class="brand-pip" style="grid-area:3/3"></i></span></button><a href="#games" aria-label="Arena Games"><span>Arena <em>Games</em></span></a></div>
+ <nav aria-label="Games"><div class="nav-label" data-i18n="nav">YOUR GAMES</div>
+  <a class="nav-item active" href="#games"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span data-i18n="all">All games</span></a>
+  <a class="nav-item" href="https://dice-jumbo-2.onrender.com/jamb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="16" cy="16" r="1"/></svg><span data-i18n="jambTitle">Yamb</span></a>
+  <a class="nav-item" href="/covece"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="6" r="3"/><path d="M9 10h6l2 10H7z"/></svg><span data-i18n="ludoShort">Ludo</span></a>
+ </nav>
+ <div class="sidebar-bottom"><b data-i18n="friends">Good company. A great game.</b><span data-i18n="noAccount">No account needed.</span></div>
+</aside>
+<div class="content">
+ <header class="topbar"><span class="prototype-tag" data-i18n="prototype">ARENA GAMES</span><button class="language" id="language" type="button" aria-label="Switch language to Serbian"><span aria-hidden="true">🌐</span> <span id="languageTarget">Srpski</span></button></header>
+ <main class="main" id="games">
+  <div class="intro"><span class="eyebrow" data-i18n="eyebrow">YOUR PLACE TO PLAY</span><h1 data-i18n="title">What shall we play?</h1><p data-i18n="intro">Pick a favorite, invite your friends and gather around the same table.</p></div>
+  <div class="games">
+   <article class="card">
+    <div class="art"><span class="game-type" data-i18n="diceType">DICE & STRATEGY</span>
+     <svg viewBox="0 0 450 228" aria-hidden="true"><defs><pattern id="felt" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M0 7L7 0" stroke="#51603e" stroke-opacity=".2"/></pattern></defs><rect width="450" height="228" fill="url(#felt)"/>
+      <g transform="translate(89 47) rotate(-9 92 96)"><rect x="3" y="5" width="175" height="202" rx="8" fill="#1118"/><rect width="175" height="202" rx="7" fill="#eeece5"/><rect x="12" y="12" width="151" height="27" rx="2" fill="#deddd5"/><text x="23" y="30" fill="#52663e" font-size="11" font-weight="800" font-family="system-ui">JAMB</text><g stroke="#cfcdc3"><path d="M12 47H163M12 64H163M12 81H163M12 98H163M12 115H163M12 132H163M12 149H163M12 166H163M12 183H163M46 47V183M85 47V183M124 47V183"/></g><rect x="86" y="99" width="37" height="15" fill="#d5e6bf"/><text x="99" y="110" font-size="10" font-weight="800" fill="#42632a" font-family="system-ui">18</text><g fill="#68695f" font-family="system-ui" font-size="9"><text x="22" y="60">1</text><text x="22" y="77">2</text><text x="22" y="94">3</text><text x="22" y="111">4</text><text x="22" y="128">5</text><text x="22" y="145">6</text><text x="20" y="162">Σ</text><text x="20" y="179">M</text></g></g>
+      <g transform="translate(267 91) rotate(13 39 39)"><rect y="6" width="76" height="76" rx="14" fill="#1117"/><rect width="76" height="76" rx="13" fill="#faf9f3" stroke="#dddcd2" stroke-width="2"/><g fill="#343830"><circle cx="23" cy="23" r="5"/><circle cx="53" cy="23" r="5"/><circle cx="38" cy="38" r="5"/><circle cx="23" cy="53" r="5"/><circle cx="53" cy="53" r="5"/></g></g>
+      <g transform="translate(227 162) rotate(-13 25 25)"><rect y="4" width="52" height="52" rx="10" fill="#1117"/><rect width="52" height="52" rx="10" fill="#faf9f3" stroke="#81b64c" stroke-width="2"/><g fill="#343830"><circle cx="16" cy="16" r="3.8"/><circle cx="36" cy="36" r="3.8"/><circle cx="26" cy="26" r="3.8"/></g></g>
+     </svg>
+    </div>
+    <div class="card-body"><h2 data-i18n="jambTitle">Yamb</h2><p data-i18n="jambDescription">Six dice, smart choices and a score sheet full of possibilities. Every roll can change the game.</p><div class="meta"><span data-i18n="jambPlayers">1–4 players</span><span data-i18n="soloOnline">Solo or online</span><span data-i18n="phone">Phone & desktop</span></div><div class="actions"><a class="play" href="https://dice-jumbo-2.onrender.com/jamb"><span data-i18n="play">Play</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a><button class="rules" type="button" data-game="jamb" data-i18n="about">About</button></div></div>
+   </article>
+   <article class="card">
+    <div class="art ludo"><span class="game-type" data-i18n="boardType">A CLASSIC WITH FRIENDS</span>
+     <svg viewBox="0 0 450 228" aria-hidden="true"><defs><pattern id="boardDots" width="17" height="17" patternUnits="userSpaceOnUse"><rect x="2" y="2" width="12" height="12" rx="2" fill="#dad8ce"/></pattern></defs><g transform="translate(126 24) rotate(7 100 100)"><rect x="4" y="6" width="200" height="200" rx="13" fill="#1117"/><rect width="200" height="200" rx="12" fill="#eeece5"/><rect x="66" y="9" width="68" height="182" fill="url(#boardDots)"/><rect x="9" y="66" width="182" height="68" fill="url(#boardDots)"/><rect x="11" y="11" width="49" height="49" rx="8" fill="#b56e5b"/><rect x="140" y="11" width="49" height="49" rx="8" fill="#81b64c"/><rect x="11" y="140" width="49" height="49" rx="8" fill="#d4b45e"/><rect x="140" y="140" width="49" height="49" rx="8" fill="#6a8aab"/><path d="M66 66H134V134H66z" fill="#e4e2d8"/><path d="M66 66L100 100 66 134z" fill="#b56e5b"/><path d="M66 66L100 100 134 66z" fill="#81b64c"/><path d="M134 66L100 100 134 134z" fill="#6a8aab"/><path d="M66 134L100 100 134 134z" fill="#d4b45e"/><g fill="#f4f0e2"><circle cx="25" cy="26" r="5"/><circle cx="46" cy="26" r="5"/><circle cx="25" cy="46" r="5"/><circle cx="46" cy="46" r="5"/><circle cx="154" cy="26" r="5"/><circle cx="175" cy="26" r="5"/><circle cx="154" cy="46" r="5"/><circle cx="175" cy="46" r="5"/><circle cx="25" cy="154" r="5"/><circle cx="46" cy="154" r="5"/><circle cx="25" cy="175" r="5"/><circle cx="46" cy="175" r="5"/><circle cx="154" cy="154" r="5"/><circle cx="175" cy="154" r="5"/><circle cx="154" cy="175" r="5"/><circle cx="175" cy="175" r="5"/></g></g><g transform="translate(109 139)"><ellipse cx="12" cy="40" rx="17" ry="6" fill="#1116"/><path d="M6 15h12l7 21Q12 44-1 36z" fill="#a25543"/><circle cx="12" cy="10" r="11" fill="#c17d68"/><circle cx="9" cy="7" r="3" fill="#e7b3a0"/></g><g transform="translate(326 111)"><ellipse cx="12" cy="40" rx="17" ry="6" fill="#1116"/><path d="M6 15h12l7 21Q12 44-1 36z" fill="#5a8833"/><circle cx="12" cy="10" r="11" fill="#92bc62"/><circle cx="9" cy="7" r="3" fill="#c6e09f"/></g></svg>
+    </div>
+    <div class="card-body"><h2 data-i18n="ludoTitle">Ludo</h2><p data-i18n="ludoDescription">Bring your pieces out, race around the board and reach home first. Watch out for your friends along the way.</p><div class="meta"><span data-i18n="ludoPlayers">2–4 online players</span><span data-i18n="bots">Solo with bots</span><span data-i18n="phone">Phone & desktop</span></div><div class="actions"><a class="play" href="/covece"><span data-i18n="play">Play</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a><button class="rules" type="button" data-game="ludo" data-i18n="about">About</button></div></div>
+   </article>
+  </div>
+  <p class="hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/></svg><span data-i18n="hint">Opening a game for the first time may take about a minute. If you have a room invite, open it directly to join your friends.</span></p>
+ </main>
+ <footer class="footer"><span>© Arena Games</span><span data-i18n="footer">Two games. One place to meet.</span></footer>
+</div>
+</div>
+<dialog id="aboutDialog" aria-labelledby="dialogTitle"><h2 id="dialogTitle"></h2><p id="dialogText"></p><form method="dialog"><button data-i18n="close">Close</button></form></dialog>
+<script type="module" src="/hub/shared/arena-ui.js"></script>
+</body>
+</html>
+

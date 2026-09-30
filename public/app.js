@@ -1,4 +1,5 @@
 import { readRoomCode } from './room-code.js';
+import { returnToArena, chooseSavedEntry } from './arena-navigation.js';
 import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
 import { keyboardGameAction } from './keyboard-shortcuts.js';
@@ -304,7 +305,7 @@ function receive(next) {
       const seat = next.players.findIndex(player => player?.id === session.playerId);
       if (seat < 0) {
         events?.close(); session = null; state = null; entryView = 'setup';
-        localStorage.removeItem(storageKey); history.replaceState(null, '', '/'); render();
+        localStorage.removeItem(storageKey); history.replaceState(null, '', '/covece'); render();
         return;
       }
       if (seat !== session.seat) {
@@ -446,7 +447,7 @@ async function startSoloGame(botCount = Number($('#botCount').value), playerName
   actionHistory = [];
   state = publicGame(soloGame);
   saveSoloGame();
-  history.replaceState(null, '', '/');
+  history.replaceState(null, '', '/covece');
   entryView = 'game';
   render();
   await advanceSoloBots();
@@ -477,6 +478,20 @@ async function submit(action) {
   finally { busy = false; render(); }
 }
 
+document.querySelectorAll('[data-arena-home]').forEach(link => {
+  link.onclick = event => {
+    event.preventDefault();
+    returnToArena({
+      destination: link.href,
+      active: !!session && state?.phase !== 'finished',
+      confirm: () => window.confirm('Vrati se na izbor igara? Solo napredak se čuva, a online soba ostaje dostupna za ponovno povezivanje.'),
+      saveSolo: saveSoloGame,
+      closeStream: () => events?.close(),
+      navigate: url => location.assign(url)
+    });
+  };
+});
+
 $('#createBtn').onclick = () => submit(async () => {
   const result = await api('/api/games', 'POST', { name: $('#playerName').value.trim() || 'Igrač', seats: Number($('#seatCount').value) });
   establish(result);
@@ -492,7 +507,7 @@ $('#soloBtn').onclick = () => submit(startSoloGame);
 $('#backHome').onclick = () => { entryView = 'home'; render(); };
 $('#startBtn').onclick = () => submit(() => command('start'));
 $('#copyBtn').onclick = async () => {
-  try { await navigator.clipboard.writeText(`${location.origin}/?room=${session.id}`); toast('Pozivnica je kopirana.'); }
+  try { await navigator.clipboard.writeText(`${location.origin}/covece?room=${session.id}`); toast('Pozivnica je kopirana.'); }
   catch { toast(`Kod sobe: ${session.id}`); }
 };
 $('#leaveBtn').onclick = () => {
@@ -501,7 +516,7 @@ $('#leaveBtn').onclick = () => {
     { label: 'Napusti', primary: true, run: () => submit(async () => {
       await command('leave');
       events?.close(); session = null; state = null; entryView = 'setup';
-      localStorage.removeItem(storageKey); history.replaceState(null, '', '/');
+      localStorage.removeItem(storageKey); history.replaceState(null, '', '/covece');
     }) }
   ]);
 };
@@ -550,7 +565,11 @@ document.addEventListener('keydown', event => {
 buildBoard();
 $('#joinCode').value = readRoomCode(location.search, location.origin);
 if ($('#joinCode').value) entryView = 'setup';
-const savedSolo = restoreSoloSnapshot(localStorage.getItem(soloStorageKey));
+const storedSolo = restoreSoloSnapshot(localStorage.getItem(soloStorageKey));
+let storedOnline;
+try { storedOnline = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { storedOnline = null; }
+const savedEntry = chooseSavedEntry({ inviteCode: $('#joinCode').value, solo: storedSolo, online: storedOnline });
+const savedSolo = savedEntry.mode === 'solo' ? savedEntry.solo : null;
 if (savedSolo) {
   soloGame = savedSolo.game;
   session = { id: 'solo', seat: 0, playerId: savedSolo.playerId, solo: true };
@@ -560,9 +579,9 @@ if (savedSolo) {
   render();
   void advanceSoloBots().catch(error => toast(error.message || 'Solo partija nije nastavljena.'));
 } else {
-  if (localStorage.getItem(soloStorageKey)) localStorage.removeItem(soloStorageKey);
-  try { session = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { session = null; }
-  if (session && /^[A-HJ-NP-Z2-9]{5}$/.test(session.id || '') && /^[a-f0-9]{64}$/.test(session.token || '')) {
+  if (!storedSolo && localStorage.getItem(soloStorageKey)) localStorage.removeItem(soloStorageKey);
+  session = savedEntry.session;
+  if (session) {
     api(`/api/games/${session.id}`, 'GET', undefined, session.token).then(receive).then(connect).catch(() => { localStorage.removeItem(storageKey); session = null; state = null; render(); });
   } else session = null;
   render();
