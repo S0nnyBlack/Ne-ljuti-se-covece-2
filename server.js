@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { securityHeaders } from './security.js';
 import path from 'node:path';
 import { createReadStream, statSync } from 'node:fs';
 import { randomBytes, randomInt } from 'node:crypto';
@@ -42,6 +43,7 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new TypeError('PUBLIC_URL must be an HTTP(S) URL without credentials');
   }
   const allowedOrigin = publicUrl ? new URL(publicUrl).origin : null;
+  const responseHeaders = securityHeaders(publicUrl);
   const listeners = new Map();
   const rates = new RateLimiter(now);
   const store = new RoomStore({ dataDir, now, limits, persist, onDelete(id) {
@@ -63,8 +65,7 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
     return { seat, hash };
   }
   const server = http.createServer(async (req, res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'no-referrer');
+    for (const [name, value] of Object.entries(responseHeaders)) res.setHeader(name, value);
     try {
       const url = new URL(req.url, 'http://localhost');
       const parts = url.pathname.split('/').filter(Boolean);
