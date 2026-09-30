@@ -210,7 +210,7 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   assert.equal((await fetch(f.url('/game.js'))).status, 200);
   assert.equal((await fetch(f.url('/solo-bots.js'))).status, 200);
   assert.equal((await fetch(f.url('/keyboard-shortcuts.js'))).status, 200);
-  assert.match(page, /Solo igra sa botovima/);
+  assert.match(page, /Solo igra/);
   assert.match(page, /<details class="mobile-menu"><summary>Meni<\/summary>/);
   assert.match(page, /id="mobileRules">Kako se igra<\/button>/);
   assert.doesNotMatch(page, /<section class="rules-card"/);
@@ -236,6 +236,13 @@ test('the server serves every module imported by the browser app', async t => {
   assert.ok(seen.has('/solo-storage.js'));
   assert.ok(seen.has('/piece-motion.js'));
   assert.ok(seen.has('/game-feed.js'));
+  for (const route of ['/game-navigation.js', '/game-i18n.js', '/hub/shared/language.js', '/hub/shared/brand-die.js']) assert.ok(seen.has(route), route);
+  const page = await (await fetch(f.url('/covece'))).text();
+  assert.equal((page.match(/data-brand-die/g) || []).length, 2);
+  assert.equal((page.match(/data-game-language/g) || []).length, 2);
+  assert.match(page, /id="homeRules"/);
+  assert.match(page, /href="https:\/\/dice-jumbo-2\.onrender\.com\/jamb"/);
+  assert.match(page, /href="\/" data-arena-home/);
 });
 
 test('Render deployment uses its public URL unless a custom URL is configured', async t => {

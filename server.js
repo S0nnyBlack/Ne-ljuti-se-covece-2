@@ -82,7 +82,7 @@ export function createApp({ dataDir = path.join(root, 'data'), rng = () => rando
         createReadStream(target).pipe(res);
         return;
       }
-      if (req.method === 'GET' && ['/covece', '/covece/', '/index.html', '/arena-navigation.js', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/piece-motion.js', '/solo-storage.js', '/game-feed.js', '/game.js', '/menu.css'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/covece', '/covece/', '/index.html', '/arena-navigation.js', '/game-navigation.js', '/game-i18n.js', '/app.js', '/room-code.js', '/solo-bots.js', '/keyboard-shortcuts.js', '/piece-motion.js', '/solo-storage.js', '/game-feed.js', '/game.js', '/menu.css'].includes(url.pathname)) {
         const file = ['/covece', '/covece/'].includes(url.pathname) ? 'index.html' : url.pathname.slice(1);
         const target = url.pathname === '/game.js' ? path.join(root, 'game.js') : path.join(root, 'public', file);
         const contentType = file.endsWith('.js') ? 'text/javascript; charset=utf-8' : file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';
