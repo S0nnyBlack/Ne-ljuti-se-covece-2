@@ -281,6 +281,7 @@ test('Arena homepage, English entry, room redirects and public modules are avail
     const response = await fetch(f.url(route));
     assert.equal(response.status, 200);
     const page = await response.text();
+    assert.doesNotMatch(page, /<base\b/);
     assert.match(page, /src="\/app.js"/);
     assert.match(page, /href="\/menu.css"/);
     assert.match(page, /id="enterOnline"/);
