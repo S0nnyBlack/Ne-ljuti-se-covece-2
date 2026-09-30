@@ -201,7 +201,7 @@ test('origin, oversized bodies, unknown credentials and invalid command metadata
   const other = await f.create();
   assert.equal((await f.request(`/api/games/${host.id}`, { token: other.token })).status, 401);
   assert.equal((await f.request(`/api/games/${host.id}/start`, { token: host.token, payload: {} })).status, 400);
-  const page = await (await fetch(f.url('/'))).text();
+  const page = await (await fetch(f.url('/covece'))).text();
   assert.match(page, /Kod od 5 znakova/);
   const client = await (await fetch(f.url('/app.js'))).text();
   assert.match(client, /authorization: `Bearer/);
@@ -265,4 +265,47 @@ test('limiter prunes expired keys and absolute/finished room lifetime is enforce
   store.limits = { maxAgeMs: 100, idleMs: 1000, finishedMs: 10 };
   assert.equal(store.expired({ createdAt: time - 100, touchedAt: time }), true);
   assert.equal(store.expired({ createdAt: time, touchedAt: time, finishedAt: time - 10 }), true);
+});
+
+test('Arena homepage, English entry, room redirects and public modules are available', async t => {
+  const f = await fixture(t);
+  const home = await (await fetch(f.url('/'))).text();
+  assert.match(home, /Arena Games — Izaberi igru/);
+  assert.match(home, /href="\/covece"/);
+  assert.match(home, /href="https:\/\/dice-jumbo-2.onrender.com\/jamb"/);
+  assert.doesNotMatch(home, /PROTOTIP|PROTOTYPE|src="\/app.js"/);
+  const english = await (await fetch(f.url('/en.html'))).text();
+  assert.match(english, /<html lang="en">/);
+  assert.match(english, /What shall we play/);
+  for (const route of ['/covece', '/covece/', '/index.html', '/covece?room=ABCDE']) {
+    const response = await fetch(f.url(route));
+    assert.equal(response.status, 200);
+    const page = await response.text();
+    assert.match(page, /src="\/app.js"/);
+    assert.match(page, /href="\/menu.css"/);
+    assert.match(page, /id="enterOnline"/);
+    assert.match(page, /data-arena-home/);
+  }
+  const invite = await fetch(f.url('/?room=ABCDE&lang=en'), { redirect: 'manual' });
+  assert.equal(invite.status, 302);
+  assert.equal(invite.headers.get('location'), '/covece?room=ABCDE&lang=en');
+  const seen = new Set();
+  async function visit(route) {
+    if (seen.has(route)) return;
+    seen.add(route);
+    const response = await fetch(f.url(route));
+    assert.equal(response.status, 200, route);
+    const source = await response.text();
+    if (route.endsWith('.js')) {
+      assert.match(response.headers.get('content-type'), /^text\/javascript/);
+      for (const match of source.matchAll(/^import\s+.+?\s+from\s+['"]([^'"]+)['"];?/gm)) {
+        await visit(new URL(match[1], f.url(route)).pathname);
+      }
+    } else assert.match(response.headers.get('content-type'), /^text\/css/);
+  }
+  for (const match of home.matchAll(/<(?:script|link)\b[^>]*(?:src|href)="([^"]+)"/g)) await visit(match[1]);
+  assert.equal(seen.size, 5);
+  for (const route of ['/hub/shared/missing.js', '/hub/shared/../../server.js', '/package.json', '/server.js', '/room-store.js']) {
+    assert.equal((await fetch(f.url(route))).status, 404);
+  }
 });

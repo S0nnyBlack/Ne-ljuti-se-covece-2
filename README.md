@@ -11,7 +11,7 @@ npm test
 npm start
 ```
 
-Otvori `http://localhost:3000`. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Početni ekran vodi na online sto sa odvojenim karticama za kreiranje i pridruživanje. Domaćin u čekaonici deli pozivni link i pokreće partiju kada se pridruže najmanje dva igrača. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. „Nova partija” pravi novu sobu.
+Otvori `http://localhost:3000` za izbor igara ili `/covece` za igru. `PORT` i `HOST` se mogu zadati kroz okruženje; podrazumevani `HOST` je `0.0.0.0`. Početni ekran vodi na online sto sa odvojenim karticama za kreiranje i pridruživanje. Domaćin u čekaonici deli pozivni link i pokreće partiju kada se pridruže najmanje dva igrača. Pregledač čuva pristupni token kako bi se partija nastavila posle osvežavanja. „Nova partija” pravi novu sobu.
 
 ## Pravila
 
@@ -63,3 +63,32 @@ Sobe bez uspešne izmene 30 minuta, sobe starije od 24 sata i završene sobe sta
 ## Provera
 
 `npm test` proverava originalna pravila igre, autorizaciju HTTP/SSE, kodove i heševe, restart, duplikate, istovremene i zastarele komande, rollback nakon greške upisa, prenos domaćinstva, granice pokušaja, kapacitet, poreklo zahteva i istek. GitHub Actions pokreće iste testove na Node 22 i 24.
+
+## Arena Games početna stranica
+
+Početna stranica na `/` prati odobreni Jamb Arena prototip: isti raspored, boje, kartice dve igre, srpski i engleski, dugme za jezik, dinamična ukrasna kockica i dijalozi „O igri”. Ukrasna kockica menja lice pri kliku i prikazuje zvezdicu svakog desetog klika; nije povezana sa bacanjima u partiji.
+
+| Ruta | Sadržaj |
+| --- | --- |
+| `/` | Arena Games izbor igara |
+| `/en.html` | Engleska početna stranica |
+| `/covece` | Solo izbor, online sto, sobe i igra |
+| `/covece?room=ABCDE` | Poziv u sobu |
+| `/?room=ABCDE` | Prethodne pozivnice: preusmeravaju na igru uz očuvane parametre |
+| `/index.html` | Kompatibilna direktna adresa igre |
+
+Kartica Jamb vodi na [Jamb igru](https://dice-jumbo-2.onrender.com/jamb). Igra ima „Sve igre” i Jamb link u desktop i mobilnom meniju. Pre napuštanja aktivne partije traži se potvrda: solo napredak se čuva, lokalni SSE stream zatvara, a online token i soba ostaju dostupni za ponovno povezivanje. Pozivnica ima prednost nad drugačijom zapamćenom partijom.
+
+Jezik početne stranice prati sačuvani izbor ili prvi podržani srpski/engleski jezik pregledača. Eksplicitni `?lang=en` ili `/en.html` otvara engleski. Ključ je `arena.ui.language.v1`, isti kao u Jamb šablonu; svaki domen ima svoje skladište. Interfejs same Čoveče igre ostaje na srpskom.
+
+### Kod i Render
+
+- `public/hub/index.html`, `public/hub/en.html`: početne stranice.
+- `public/hub/shared/arena.css`: odobreni zajednički dizajn.
+- `brand-die.js`, `language.js`, `messages.js`, `arena-ui.js`: odvojeni delovi za kockicu, jezike i kontrole.
+- `public/arena-navigation.js`: bezbedan povratak i prioritet pozivnice.
+- `server.js`: eksplicitno dozvoljene javne rute; izvorni server, podaci i tokeni nisu javni fajlovi.
+
+Postojeći Render servis služi i hub. Nema novih paketa, servisa ili baze. Hub ne otvara game API/SSE u pozadini; besplatni servis može imati spor prvi ulazak dok se pokreće. Postojeća komanda `npm start` ostaje dovoljna.
+
+GitHub Actions na Node 22 i 24 proverava postojeća pravila/API, jezike i kockicu početne stranice, otkazivanje/odobravanje navigacije, prioritet poziva, rute i HTTP dostupnost svih modula. Proverava se i sintaksa novih browser modula.
