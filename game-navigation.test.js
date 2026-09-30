@@ -65,6 +65,7 @@ test("game entry keeps direct game links, interactive controls and centered resp
   assert.equal((page.match(/data-game-language/g)||[]).length,2);
   assert.equal((page.match(/href="https:\/\/dice-jumbo-2\.onrender\.com\/jamb"/g)||[]).length,2);
   assert.equal((page.match(/href="\/" data-arena-home/g)||[]).length,2);
+  for(const label of ["Sve igre","Jamb","Igraj čoveče","Kako se igra"]) assert.ok(page.includes('aria-label="' + label + '"'),label);
   assert.match(page,/id="homeRules"/); assert.match(page,/id="soloBtn"/); assert.match(page,/id="enterOnline"/);
   assert.match(css,/#homeView/); assert.match(css,/max-width: 640px/); assert.match(css,/prefers-reduced-motion/);
   assert.match(app,/dataset\.userContent/); assert.match(app,/homeRules.*showRules/);
