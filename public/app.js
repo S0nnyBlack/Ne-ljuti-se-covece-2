@@ -1,4 +1,5 @@
 import { readRoomCode } from './room-code.js';
+import { initializeGameNavigation } from './game-navigation.js';
 import { returnToArena, chooseSavedEntry } from './arena-navigation.js';
 import { newGame, join as joinGame, start as startGame, roll as rollGame, move as moveGame, publicGame } from '../game.js';
 import { chooseBotMove, rollBotDie } from './solo-bots.js';
@@ -6,6 +7,8 @@ import { keyboardGameAction } from './keyboard-shortcuts.js';
 import { movementPositions } from './piece-motion.js';
 import { restoreSoloSnapshot } from './solo-storage.js';
 import { describeAction } from './game-feed.js';
+
+const navigation = initializeGameNavigation();
 
 const colors = ['red', 'blue', 'yellow', 'green'];
 const names = ['Crveni', 'Plavi', 'Žuti', 'Zeleni'];
@@ -159,6 +162,7 @@ function renderPlayers() {
     const info = document.createElement('div');
     const title = document.createElement('strong');
     title.textContent = state?.players[seat]?.name || names[seat];
+    if (state?.players[seat]) title.dataset.userContent = 'true';
     const sub = document.createElement('small');
     sub.textContent = seat >= (state?.seats || 4) ? 'Nije u partiji' : !state?.players[seat] ? 'Slobodno mesto' :
       state.phase === 'lobby' ? 'Spreman' : state.phase === 'choose-starter' ?
@@ -280,6 +284,8 @@ function renderLobby() {
     const info = document.createElement('div');
     const title = document.createElement('strong');
     title.textContent = player ? `${player.name}${seat === 0 ? ' ★' : ''}` : 'Čeka igrača…';
+    if (player) title.dataset.userContent = 'true';
+    avatar.dataset.userContent = 'true';
     const subtitle = document.createElement('small');
     subtitle.textContent = player ? names[seat] : 'Slobodno mesto';
     info.append(title, subtitle);
@@ -484,7 +490,7 @@ document.querySelectorAll('[data-arena-home]').forEach(link => {
     returnToArena({
       destination: link.href,
       active: !!session && state?.phase !== 'finished',
-      confirm: () => window.confirm('Vrati se na izbor igara? Solo napredak se čuva, a online soba ostaje dostupna za ponovno povezivanje.'),
+      confirm: () => window.confirm(navigation.translate('Vrati se na izbor igara? Solo napredak se čuva, a online soba ostaje dostupna za ponovno povezivanje.')),
       saveSolo: saveSoloGame,
       closeStream: () => events?.close(),
       navigate: url => location.assign(url)
@@ -542,6 +548,7 @@ function showRules(event) {
 }
 $('#rulesLink').onclick = showRules;
 $('#mobileRules').onclick = showRules;
+$('#homeRules').onclick = showRules;
 $('#modalBg').onclick = event => { if (event.target.id === 'modalBg') $('#modalBg').classList.remove('show'); };
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape') { $('#modalBg').classList.remove('show'); return; }

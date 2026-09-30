@@ -169,3 +169,76 @@ summary:focus-visible, select:focus-visible, input:focus-visible { outline: 3px 
 /* Share Arena navigation on narrow screens without crowding game controls. */
 .mobile-menu nav a { display: block; min-height: 44px; padding: 12px 16px; color: var(--text); font: inherit; font-weight: 750; }
 .mobile-menu nav a:hover { background: #3d4c2e; }
+
+/* Align the game entry screen with the approved Jamb Arena visual language. */
+:root { color-scheme: dark; --line: #48443f; }
+.app > div { min-width: 0; }
+.sidebar { position: sticky; top: 0; height: 100dvh; }
+.main { min-width: 0; padding: 0 16px 32px; }
+#homeView { width: min(100%, 900px); min-height: 0; margin: 32px auto 40px; display: block; }
+#homeView .menu-heading { text-align: left; margin-bottom: 22px; }
+#homeView .menu-heading h1 { font-size: clamp(30px,3vw,40px); }
+.mode-list { display: grid; gap: 14px; }
+#homeView .solo-mode { margin-top: 0; }
+#homeView .mode-row { padding: 20px 22px; align-items: center; }
+#homeView .mode-description h2 { margin: 0 0 3px; font-size: 23px; }
+#homeView .mode-row .menu-button { flex: 0 0 195px; min-height: 48px; }
+#homeView .bot-field { width: min(100%, 180px); margin: 12px 0 0; font-size: 11px; }
+.mode-icon-muted { background: #393632; color: var(--text); }
+.menu-button.primary { background: linear-gradient(#91c656,#75a941); border-color: #81b64c; box-shadow: 0 3px 0 #527d2e; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px; }
+.brand-home { min-width: 0; }
+.brand-words { display: grid; line-height: 1.05; }
+.brand-words strong { font-size: 23px; font-weight: 900; letter-spacing: -1.3px; white-space: nowrap; }
+.brand-words strong span { color: var(--green); }
+.brand-words small { margin-top: 5px; color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: 1.4px; }
+.brand-mark { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; padding: 4px; border-radius: 10px; border: 1px solid #a9d876; background: linear-gradient(145deg,#9bcc5d,#70a33d); box-shadow: 0 3px 0 #456b2b,inset 0 1px #ffffff77; transition: transform 150ms ease,box-shadow 150ms ease; }
+.brand-mark:hover { transform: translateY(-2px); box-shadow: 0 5px 0 #456b2b,inset 0 1px #ffffff77; }
+.brand-mark:active { transform: translateY(1px); box-shadow: 0 1px 0 #456b2b; }
+.brand-face { display: grid; grid-template: repeat(3,6px)/repeat(3,6px); place-content: center; gap: 2px; width: 28px; height: 28px; border-radius: 6px; background: #f8f7ef; box-shadow: 0 2px 0 #bdc9b0; }
+.brand-pip { width: 6px; height: 6px; border-radius: 50%; background: #41642d; }
+.brand-star { color: #fff5b6; font-size: 26px; line-height: 1; text-shadow: 0 0 8px #fff4a6; }
+.nav button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 45px; padding: 10px 13px; border: 0; border-radius: 9px; background: transparent; color: #bab6af; text-align: left; font: inherit; font-size: 14px; font-weight: 750; }
+.nav button:hover { background: #33312d; color: #fff; }
+#gameView { width: min(100%,1040px); margin-inline: auto; min-height: calc(100dvh - 32px); padding-block: 20px; }
+#setupView { width: min(100%,900px); }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .sidebar .brand-home { display: none; }
+  .sidebar .brand { justify-content: center; padding: 0; }
+  .sidebar .nav button { font-size: 0; justify-content: center; }
+  .sidebar .nav a > span:first-child { display: inline-grid; place-items: center; width: 20px; font-size: 20px; }
+}
+@media (max-width: 820px) {
+  #homeView .mode-row { flex-wrap: wrap; }
+  #homeView .mode-row .menu-button { flex: 1 1 100%; }
+}
+@media (max-width: 640px) {
+  .sidebar { display: none; }
+  .mobile-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; }
+  .mobile-top .brand { flex: 1; min-width: 0; padding: 0; }
+  .mobile-top .brand-home { display: block; }
+  .mobile-top .brand-words strong { font-size: 19px; }
+  .mobile-top .brand-words small { display: none; }
+  .mobile-top .brand-home { font-size: inherit; color: var(--text); }
+  .mobile-language { min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--text); font-size: 12px; font-weight: 750; }
+  .mobile-menu { width: 100%; margin: 0; }
+  .mobile-menu summary { width: 100%; min-height: 40px; }
+  .mobile-menu nav { left: 12px; right: 12px; }
+  .main { padding: 0 12px 24px; }
+  #homeView { min-height: 0; margin: 20px auto 28px; }
+  #homeView .mode-row { padding: 17px; grid-template-columns: 48px minmax(0,1fr); gap: 10px 12px; }
+  #homeView .mode-description h2 { font-size: 20px; }
+  #homeView .bot-field { grid-column: auto; width: 100%; }
+  #homeView .mode-row .menu-button { width: 100%; grid-column: 1 / -1; }
+  .rules-teaser { flex-direction: column; align-items: stretch; }
+  #gameView { min-height: 0; padding-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .brand-mark { transition: none; } }
+
+.sidebar .brand { padding-inline: 4px; }
+.sidebar .brand-words strong { font-size: 18px; letter-spacing: -.9px; }
+.nav button span:first-child { width: 21px; flex: 0 0 21px; }
+@media (min-width: 641px) and (max-width: 1100px) {
+  .sidebar .nav button span:first-child { font-size: 20px; }
+  .sidebar .nav .language-label { display: none; }
+}

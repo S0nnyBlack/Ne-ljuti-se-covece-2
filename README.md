@@ -79,13 +79,14 @@ Početna stranica na `/` prati odobreni Jamb Arena prototip: isti raspored, boje
 
 Kartica Jamb vodi na [Jamb igru](https://dice-jumbo-2.onrender.com/jamb). Igra ima „Sve igre” i Jamb link u desktop i mobilnom meniju. Pre napuštanja aktivne partije traži se potvrda: solo napredak se čuva, lokalni SSE stream zatvara, a online token i soba ostaju dostupni za ponovno povezivanje. Pozivnica ima prednost nad drugačijom zapamćenom partijom.
 
-Jezik početne stranice prati sačuvani izbor ili prvi podržani srpski/engleski jezik pregledača. Eksplicitni `?lang=en` ili `/en.html` otvara engleski. Ključ je `arena.ui.language.v1`, isti kao u Jamb šablonu; svaki domen ima svoje skladište. Interfejs same Čoveče igre ostaje na srpskom.
+Jezik početne stranice prati sačuvani izbor ili prvi podržani srpski/engleski jezik pregledača. Eksplicitni `?lang=en` ili `/en.html` otvara engleski. Ključ je `arena.ui.language.v1`, isti kao u Jamb šablonu; svaki domen ima svoje skladište. Ekran igre `/covece` koristi isti stil i Solo/Online kartice kao Jamb. Desktop i mobilni meni imaju interaktivnu kockicu sa zajedničkim stanjem i dugme za srpski/engleski. Promena jezika ne menja partiju niti imena igrača. Listanje pravila je dostupno i pre početka partije. Link Jamb vodi direktno na `/jamb`, dok „Sve igre” vodi na `/`.
 
 ### Kod i Render
 
 - `public/hub/index.html`, `public/hub/en.html`: početne stranice.
 - `public/hub/shared/arena.css`: odobreni zajednički dizajn.
 - `brand-die.js`, `language.js`, `messages.js`, `arena-ui.js`: odvojeni delovi za kockicu, jezike i kontrole.
+- `public/game-navigation.js`, `public/game-i18n.js`: kockica, jezik i prevod promenljivog sadržaja igre uz očuvanje imena igrača.
 - `public/arena-navigation.js`: bezbedan povratak i prioritet pozivnice.
 - `server.js`: eksplicitno dozvoljene javne rute; izvorni server, podaci i tokeni nisu javni fajlovi.
 
